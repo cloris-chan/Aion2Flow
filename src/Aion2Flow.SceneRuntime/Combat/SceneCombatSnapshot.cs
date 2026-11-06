@@ -59,8 +59,10 @@ public sealed class SceneCombatSnapshot
         NpcRuntimeObservationSnapshot? targetObservation,
         EncounterSummarySnapshot encounter,
         SceneBossFocusSnapshot[] bossFocuses,
-        int[] bossNpcCodes)
+        int[] bossNpcCodes,
+        SceneClientContext? clientContext = null)
     {
+        ClientContext = clientContext ?? SceneClientContext.Purple;
         EncounterId = encounterId;
         Kind = kind;
         ReadModelRevision = readModelRevision;
@@ -78,6 +80,8 @@ public sealed class SceneCombatSnapshot
     }
 
     public Guid EncounterId { get; }
+
+    public SceneClientContext ClientContext { get; }
 
     public SceneKind Kind { get; }
 

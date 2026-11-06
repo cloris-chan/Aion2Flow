@@ -1,0 +1,64 @@
+{
+  "ResourceSetId": "steam",
+  "Rows": 734,
+  "MapKeyRows": 359,
+  "SubzoneKeyRows": 73,
+  "Locales": [
+    {
+      "Language": "en-US",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "ko-KR",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "ja-JP",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "de-DE",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "fr-FR",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "es-ES",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "pt-BR",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "ru-RU",
+      "VerifiedNames": 203,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    }
+  ]
+}

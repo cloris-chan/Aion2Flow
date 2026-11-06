@@ -756,13 +756,29 @@ internal static class DisplayIconCache
 
     internal static Uri ResolveSkillIconAssetUri(string assetName)
     {
-        if (Path.GetFileName(assetName) != assetName ||
-            !assetName.EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetName);
+        var separator = assetName.IndexOf('/');
+        if (separator <= 0 ||
+            !assetName.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ||
+            !IsAssetSegment(assetName.AsSpan(0, separator)) ||
+            !IsAssetSegment(assetName.AsSpan(separator + 1, assetName.Length - separator - 6)))
         {
-            throw new ArgumentException("Skill icon asset name must be a WebP file name.", nameof(assetName));
+            throw new ArgumentException("Skill icon asset name must be a resource-set-qualified WebP path.", nameof(assetName));
         }
 
         return new Uri($"avares://Aion2Flow/Assets/Images/Skills/{assetName}");
+
+        static bool IsAssetSegment(ReadOnlySpan<char> segment)
+        {
+            if (segment.IsEmpty) return false;
+            foreach (var character in segment)
+            {
+                if (!char.IsAsciiLetterOrDigit(character) && character is not ('_' or '-'))
+                    return false;
+            }
+
+            return true;
+        }
     }
 
     private static Bitmap Load(string fileName) => new(AssetLoader.Open(new Uri($"avares://Aion2Flow/Assets/Images/{fileName}")));

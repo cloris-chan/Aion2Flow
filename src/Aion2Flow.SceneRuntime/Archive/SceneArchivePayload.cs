@@ -47,6 +47,7 @@ public sealed class SceneArchivePayload
     }
 
     public SceneCombatSnapshot Snapshot { get; }
+    public SceneClientContext ClientContext => Snapshot.ClientContext;
     public SceneKind Kind { get; }
     public DateTimeOffset SceneStarted { get; }
     public SceneJournalSegment TimelineSegment { get; }

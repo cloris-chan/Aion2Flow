@@ -286,12 +286,12 @@ public sealed class EncounterArchiveServiceTests
     private static SceneReadModelOwner CreateSceneOwner(int playerId, int bossId, DateTimeOffset sceneStarted)
     {
         const int bossCode = 2_999_997;
-        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>
+        var clientContext = CombatResourceTestFixture.CreateContext([], new Dictionary<int, NpcDisplayEntry>
         {
             [bossCode] = new(bossCode, "Archive Boss", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
 
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: clientContext);
         var sceneId = Guid.NewGuid();
         AppendState(journal, sceneId, playerId, 0, StateCodes.PlayerIdentity, 0, 0, "Tester", 1, 1_000);
         AppendState(journal, sceneId, bossId, 0, bossCode, 0, 0, null, 2, 1_001);

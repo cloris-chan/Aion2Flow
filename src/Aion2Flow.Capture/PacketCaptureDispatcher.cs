@@ -67,21 +67,7 @@ public sealed class PacketCaptureDispatcher
             {
                 await foreach (var item in PacketCaptureChannel.ReadAllAsync(_cts.Token))
                 {
-                    try
-                    {
-                        try
-                        {
-                            DispatchItem(item);
-                        }
-                        catch (Exception ex)
-                        {
-                            CaptureLog.Write(CaptureLogLevel.Error, $"Packet dispatch failed: {ex.Message}");
-                        }
-                    }
-                    finally
-                    {
-                        try { item.Return(); } catch (Exception) { }
-                    }
+                    DispatchAndReturn(item);
                 }
             }
             catch (OperationCanceledException) when (_cts.Token.IsCancellationRequested) { }
@@ -92,7 +78,7 @@ public sealed class PacketCaptureDispatcher
         }, TaskCreationOptions.LongRunning).Unwrap();
     }
 
-    public async Task StopAsync()
+    public async Task StopAsync(bool drainPending = false)
     {
         _cts?.Cancel();
 
@@ -110,6 +96,13 @@ public sealed class PacketCaptureDispatcher
             _worker = null;
         }
 
+        if (drainPending)
+        {
+            while (PacketCaptureChannel.TryRead(out var item))
+                DispatchAndReturn(item);
+        }
+
+        _cts?.Dispose();
         _cts = null;
         DisposeAllStreams();
         _acknowledgments.Clear();
@@ -130,6 +123,22 @@ public sealed class PacketCaptureDispatcher
             CaptureDispatchItemKind.AcknowledgmentAvailable => DispatchAcknowledgmentAvailable(),
             _ => false
         };
+    }
+
+    private void DispatchAndReturn(CaptureDispatchItem item)
+    {
+        try
+        {
+            DispatchItem(item);
+        }
+        catch (Exception ex)
+        {
+            CaptureLog.Write(CaptureLogLevel.Error, $"Packet dispatch failed: {ex.Message}");
+        }
+        finally
+        {
+            try { item.Return(); } catch (Exception) { }
+        }
     }
 
     private bool DispatchActivePacket(CapturedPacket packet)
@@ -702,7 +711,7 @@ public sealed class PacketCaptureDispatcher
             }
 
             _recovery?.Dispose();
-            _recovery = new TcpWorldStreamRecoveryBuffer();
+            _recovery = new TcpWorldStreamRecoveryBuffer(ClientPacketProtocol.Resolve(Sink.ClientContext.Profile));
             _transportOrdinal = transportOrdinal;
         }
 
@@ -737,7 +746,7 @@ public sealed class PacketCaptureDispatcher
                     CaptureLogLevel.Warning,
                     $"TCP capture gap recovery candidate rejected: transport={_transportOrdinal}.");
                 recovery.Dispose();
-                _recovery = new TcpWorldStreamRecoveryBuffer();
+                _recovery = new TcpWorldStreamRecoveryBuffer(ClientPacketProtocol.Resolve(Sink.ClientContext.Profile));
                 return false;
             }
 

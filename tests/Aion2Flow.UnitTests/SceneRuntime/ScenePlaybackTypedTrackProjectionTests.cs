@@ -186,6 +186,7 @@ public sealed class ScenePlaybackTypedTrackProjectionTests
         SceneJournalSegment segment,
         SceneCombatSnapshot snapshot) : IScenePlaybackSource
     {
+        public Cloris.Aion2Flow.SceneRuntime.SceneClientContext ClientContext => segment.ClientContext;
         public Guid EncounterId { get; } = encounterId;
         public DateTimeOffset SceneStarted => DateTimeOffset.UnixEpoch;
         public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;

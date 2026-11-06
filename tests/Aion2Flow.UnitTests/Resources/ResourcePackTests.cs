@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
-using System.Collections;
 using System.Reflection;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.Resources.Generated;
 
@@ -36,8 +36,8 @@ public sealed class ResourcePackTests
     }
 
     [Fact]
-    public void Load_Rejects_Unsupported_Language()
-        => Assert.Throws<ArgumentOutOfRangeException>(() => ResourceCatalog.Load("ja-JP"));
+    public void Load_Uses_Set_Default_For_Unsupported_Language()
+        => Assert.Same(ResourceCatalog.Load(ClientProfiles.Purple), ResourceCatalog.Load(ClientProfiles.Purple, "ja-JP"));
 
     [Fact]
     public void NpcCatalog_Contains_Known_Numeric_Code()
@@ -250,9 +250,9 @@ public sealed class ResourcePackTests
     [InlineData(30011101, "Icon_Item_Usable_Godstone_WP_r_004.webp")]
     public void Generated_SkillIconCatalog_Resolves_Asset_Outside_Pack(int skillCode, string expectedAssetName)
     {
-        var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
+        var assetName = ResourceCatalog.Load(ClientProfiles.Purple).ResolveSkillIconAssetName(skillCode);
 
-        Assert.Equal(expectedAssetName, assetName);
+        Assert.Equal($"purple/{expectedAssetName}", assetName);
         Assert.True(File.Exists(ResolveSkillIconPath(assetName)));
     }
 
@@ -292,14 +292,13 @@ public sealed class ResourcePackTests
     [Fact]
     public void Runtime_Packs_Contain_Only_Current_Sections()
     {
-        var manifestType = ResolveGeneratedType("ResourcePackManifest");
-        var sharedResourceName = Assert.IsType<string>(manifestType.GetField("SharedResourceName", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var sharedUncompressedLength = Assert.IsType<int>(manifestType.GetField("SharedUncompressedLength", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var locales = ReadLocaleManifestEntries(manifestType);
+        var resourceSet = ResourceCatalog.GetResourceSet(ClientProfiles.Purple);
+        var sharedResourceName = resourceSet.SharedPack.ResourceName;
+        var sharedUncompressedLength = resourceSet.SharedPack.UncompressedLength;
 
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], ReadSectionIds(sharedResourceName));
         Assert.True(sharedUncompressedLength < 3_000_000, $"Shared runtime pack expanded to {sharedUncompressedLength} bytes.");
-        Assert.All(locales.Values, resourceName => Assert.Equal([101, 102, 103, 104], ReadSectionIds(resourceName)));
+        Assert.All(resourceSet.LocalePacks, locale => Assert.Equal([101, 102, 103, 104], ReadSectionIds(locale.ResourceName)));
     }
 
     [Fact]
@@ -307,27 +306,24 @@ public sealed class ResourcePackTests
     {
         var assembly = typeof(ResourceCatalog).Assembly;
         var resourceNames = assembly.GetManifestResourceNames().ToHashSet(StringComparer.Ordinal);
-        var manifestType = ResolveGeneratedType("ResourcePackManifest");
-        var sharedResourceName = Assert.IsType<string>(manifestType.GetField("SharedResourceName", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var locales = ReadLocaleManifestEntries(manifestType);
+        var resourceSet = ResourceCatalog.GetResourceSet(ClientProfiles.Purple);
 
-        Assert.Contains(sharedResourceName, resourceNames);
+        Assert.Contains(resourceSet.SharedPack.ResourceName, resourceNames);
         Assert.Equal(
             new[] { ResourceLanguage.English, ResourceLanguage.Korean, ResourceLanguage.TraditionalChinese },
-            locales.Keys.Order(StringComparer.Ordinal).ToArray());
-        Assert.All(locales.Values, resourceName => Assert.Contains(resourceName, resourceNames));
+            resourceSet.Languages.Order(StringComparer.Ordinal).ToArray());
+        Assert.All(resourceSet.LocalePacks, locale => Assert.Contains(locale.ResourceName, resourceNames));
     }
 
     [Fact]
     public void ResourcePackReader_Fails_For_Invalid_Header_Expectations()
     {
-        var manifestType = ResolveGeneratedType("ResourcePackManifest");
-        var decoderType = ResolveGeneratedType("ResourcePackDecoder");
-        var resourceName = Assert.IsType<string>(manifestType.GetField("SharedResourceName", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var uncompressedLength = Assert.IsType<int>(manifestType.GetField("SharedUncompressedLength", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var checksum = Assert.IsType<ulong>(manifestType.GetField("SharedChecksum", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var sharedPackKind = Assert.IsType<byte>(decoderType.GetField("SharedPackKind", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-        var localePackKind = Assert.IsType<byte>(decoderType.GetField("LocalePackKind", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
+        var shared = ResourceCatalog.GetResourceSet(ClientProfiles.Purple).SharedPack;
+        var resourceName = shared.ResourceName;
+        var uncompressedLength = shared.UncompressedLength;
+        var checksum = shared.Checksum;
+        var sharedPackKind = ResourcePackDecoder.SharedPackKind;
+        var localePackKind = ResourcePackDecoder.LocalePackKind;
 
         AssertLoadPackPayloadFails("Cloris.Aion2Flow.Resources.Packs.missing.bin", sharedPackKind, uncompressedLength, checksum);
         AssertLoadPackPayloadFails(resourceName, localePackKind, uncompressedLength, checksum);
@@ -335,42 +331,23 @@ public sealed class ResourcePackTests
         AssertLoadPackPayloadFails(resourceName, sharedPackKind, uncompressedLength, checksum + 1);
     }
 
-    private static Dictionary<string, string> ReadLocaleManifestEntries(Type manifestType)
-    {
-        var locales = Assert.IsType<IEnumerable>(manifestType.GetProperty("Locales", BindingFlags.Public | BindingFlags.Static)!.GetValue(null), exactMatch: false);
-        var result = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var locale in locales)
-        {
-            var localeType = locale.GetType();
-            var language = Assert.IsType<string>(localeType.GetProperty("Language")!.GetValue(locale));
-            var resourceName = Assert.IsType<string>(localeType.GetProperty("ResourceName")!.GetValue(locale));
-            result.Add(language, resourceName);
-        }
-
-        return result;
-    }
-
     private static ushort[] ReadSectionIds(string resourceName)
     {
-        var manifestType = ResolveGeneratedType("ResourcePackManifest");
-        var decoderType = ResolveGeneratedType("ResourcePackDecoder");
         var isShared = resourceName.EndsWith("shared.bin", StringComparison.Ordinal);
-        var kindField = isShared ? "SharedPackKind" : "LocalePackKind";
-        var expectedKind = Assert.IsType<byte>(decoderType.GetField(kindField, BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
+        var expectedKind = isShared ? ResourcePackDecoder.SharedPackKind : ResourcePackDecoder.LocalePackKind;
         int expectedLength;
         ulong expectedChecksum;
         if (isShared)
         {
-            expectedLength = Assert.IsType<int>(manifestType.GetField("SharedUncompressedLength", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
-            expectedChecksum = Assert.IsType<ulong>(manifestType.GetField("SharedChecksum", BindingFlags.Public | BindingFlags.Static)!.GetValue(null));
+            var entry = ResourcePackManifest.Sets.Single(set => set.SharedPack.ResourceName == resourceName).SharedPack;
+            expectedLength = entry.UncompressedLength;
+            expectedChecksum = entry.Checksum;
         }
         else
         {
-            var locale = Assert.IsType<IEnumerable>(manifestType.GetProperty("Locales", BindingFlags.Public | BindingFlags.Static)!.GetValue(null), exactMatch: false)
-                .Cast<object>()
-                .Single(entry => string.Equals((string)entry.GetType().GetProperty("ResourceName")!.GetValue(entry)!, resourceName, StringComparison.Ordinal));
-            expectedLength = (int)locale.GetType().GetProperty("UncompressedLength")!.GetValue(locale)!;
-            expectedChecksum = (ulong)locale.GetType().GetProperty("Checksum")!.GetValue(locale)!;
+            var locale = ResourcePackManifest.Sets.SelectMany(static set => set.LocalePacks).Single(entry => entry.ResourceName == resourceName);
+            expectedLength = locale.UncompressedLength;
+            expectedChecksum = locale.Checksum;
         }
 
         var payload = LoadPackPayload(resourceName, expectedKind, expectedLength, expectedChecksum);
@@ -401,9 +378,6 @@ public sealed class ResourcePackTests
         var ex = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [resourceName, expectedKind, expectedUncompressedLength, expectedChecksum]));
         Assert.IsType<InvalidDataException>(ex.InnerException);
     }
-
-    private static Type ResolveGeneratedType(string name)
-        => typeof(ResourceCatalog).Assembly.GetType($"Cloris.Aion2Flow.Resources.Generated.{name}", throwOnError: true)!;
 
     private static Type ResolveCatalogType(string name)
         => typeof(ResourceCatalog).Assembly.GetType($"Cloris.Aion2Flow.Resources.Catalog.{name}", throwOnError: true)!;

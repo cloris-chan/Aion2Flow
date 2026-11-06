@@ -2,6 +2,7 @@ using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Model;
+using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
@@ -9,17 +10,20 @@ using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
-public sealed class CombatantDetailsFlyoutViewModelTests
+public sealed class CombatantDetailsFlyoutViewModelTests : IDisposable
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+    private GameResourceService? _displayResources;
+
     [Fact]
     public void SelectBattleCombatant_Builds_Live_Battle_Sections_And_Filters_By_Target()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -59,12 +63,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Computes_DamageSkillShare_From_CurrentSectionTotal()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -96,12 +100,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Computes_PerDamage_Statistics_From_Filtered_Contributions()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -126,12 +130,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_Filtered_Damage_Duration_For_Subset_Counterparts()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -168,12 +172,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_Independent_Healing_And_Shield_Filters_And_Durations()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int allyOneId = 1002;
@@ -243,12 +247,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Single_Filtered_Damage_Event()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -272,12 +276,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Uses_One_Second_Minimum_For_Subsecond_Filtered_Healing_Events()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -307,12 +311,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Builds_Live_Detail_From_Scene_Projection()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
-        var scene = new SceneLiveReadModel();
+        var viewModel = CreateViewModel(localization);
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -358,12 +362,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Includes_Summon_Detail_Folded_To_Owner()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
-        var scene = new SceneLiveReadModel();
+        var viewModel = CreateViewModel(localization);
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -390,13 +394,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_EncounterId_Context()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
         var archive = new EncounterArchiveService();
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -426,13 +430,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
         var archive = new EncounterArchiveService();
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -463,12 +467,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Selected_Combatant_Healing_Details_Outside_Damage_Window()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -488,20 +492,20 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(400, viewModel.OutgoingHealing.Total);
         Assert.Equal(400, viewModel.IncomingHealing.Total);
         Assert.Equal(2, viewModel.OutgoingHealing.Rows.Count);
-        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => SkillName(row) == "Second Wind");
-        Assert.Contains(viewModel.OutgoingHealing.Rows, static row => SkillName(row) == "Ally Heal");
+        Assert.Contains(viewModel.OutgoingHealing.Rows, row => SkillName(row) == "Second Wind");
+        Assert.Contains(viewModel.OutgoingHealing.Rows, row => SkillName(row) == "Ally Heal");
     }
 
     [Fact]
     public void SelectSceneEncounterCombatant_Uses_Archived_ScenePayload_For_Summon_Attribution()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
         var archive = new EncounterArchiveService();
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -532,12 +536,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Splits_Healing_And_Shield_Sections_With_Independent_Scopes()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -573,12 +577,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Does_Not_Treat_Hostile_Shield_Absorption_As_Shield_Counterpart()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int healerId = 1002;
@@ -604,12 +608,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Live_Scope_Filter_Across_Refreshes()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -634,12 +638,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Preserves_Counterpart_ViewModel_Identity_Across_Relevant_Refreshes()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -673,12 +677,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Builds_PerSkill_Damage_Modifier_Summaries()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -719,15 +723,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Tracks_MultiHit_Modifiers_Without_Inflating_Direct_Hits()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(13060250, "突襲", SkillCategory.Assassin, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -765,16 +769,17 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Counts_MultiHit_Once_Per_Activation_Group()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(17010230, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17010000, "大地報應", SkillCategory.Cleric, SkillSourceType.PcSkill),
             new SkillDisplayEntry(17730000, "主神恩寵", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -848,12 +853,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Very_Large_Periodic_Damage_Totals_Consistent()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -884,17 +889,20 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Damage_Hits_And_Modifier_Rates_Ignore_Periodic_Ticks()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(17010010, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17010000, "破滅之語", SkillCategory.Cleric, SkillSourceType.PcSkill),
             new SkillDisplayEntry(17020010, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill),
-            new SkillDisplayEntry(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill)
+            new SkillDisplayEntry(17020000, "痛苦連鎖", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17030010, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill),
+            new SkillDisplayEntry(17030000, "弱化之印", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -924,7 +932,7 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         AssertModifierValues(viewModel.OutgoingDamage.BackCount, viewModel.OutgoingDamage.BackRate, 1, 4);
 
         Assert.Collection(
-            viewModel.OutgoingDamage.Rows.OrderBy(static row => SkillName(row), StringComparer.Ordinal),
+            viewModel.OutgoingDamage.Rows.OrderBy(row => SkillName(row), StringComparer.Ordinal),
             row =>
             {
                 Assert.Equal("弱化之印", SkillName(row));
@@ -952,16 +960,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Tracks_Evade_And_Block_Defense_Outcomes()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
             new SkillDisplayEntry(1100020, "Croka Light Beam", SkillCategory.Npc, SkillSourceType.Unknown)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1009,15 +1017,15 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Keeps_Synthetic_Invincible_In_Summary_Without_Showing_Fake_Dodge_Row()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1054,16 +1062,16 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Counts_UnresolvedAttacker_Invincible_In_Incoming_Summary_Without_UnknownScope()
     {
-        CombatResourceTestFixture.SetResources(
+        SetResources(
         [
             new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
             new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int bossId = 9001;
@@ -1100,12 +1108,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     [Fact]
     public void SelectBattleCombatant_Separates_Healing_From_Mana_Change_Resources()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int allyId = 1002;
@@ -1355,30 +1363,33 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Assert.Equal(expectedRate, actualRate, 10);
     }
 
-    private static string SkillName(SkillDetailRowViewModel row)
-        => CombatResourceRegistry.DisplaySkillNameFor(row.SkillCode);
+    private string SkillName(SkillDetailRowViewModel row)
+        => _clientContext.CombatResources.DisplaySkillNameFor(row.SkillCode);
 
-    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, int combatantId, bool forceRefresh = false)
+    private void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, int combatantId, bool forceRefresh = false)
     {
         var snapshot = scene.CreateSnapshot();
         SelectSceneCombatant(viewModel, scene, snapshot, combatantId, forceRefresh);
     }
 
-    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    private void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneTestHarness scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
+        viewModel.DisplayContext = new SceneDisplayContext(SceneIdentityScope.Empty, scene.Owner.MetadataRegistry, snapshot, GetDisplayResources(), "Unknown");
         viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, combatantId, snapshot, detail, forceRefresh);
     }
 
-    private static void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneReadModelOwner scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
+    private void SelectSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, SceneReadModelOwner scene, SceneCombatSnapshot snapshot, int combatantId, bool forceRefresh = false)
     {
         var detail = scene.CreateDetailDelta(snapshot, combatantId, forceRefresh);
+        viewModel.DisplayContext = new SceneDisplayContext(SceneIdentityScope.Empty, scene.MetadataRegistry, snapshot, GetDisplayResources(), "Unknown");
         viewModel.SelectSceneEncounterCombatant(snapshot.EncounterId, combatantId, snapshot, detail, forceRefresh);
     }
 
-    private static void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedEncounterRecord record, int combatantId, bool forceRefresh = false)
+    private void SelectArchivedSceneCombatant(CombatantDetailsFlyoutViewModel viewModel, ArchivedEncounterRecord record, int combatantId, bool forceRefresh = false)
     {
         var detail = record.ScenePayload.CreateDetailDelta(combatantId);
+        viewModel.DisplayContext = new SceneDisplayContext(record.ScenePayload.IdentityScope, null, record.ScenePayload.Snapshot, GetDisplayResources(), "Unknown");
         viewModel.SelectSceneEncounterCombatant(record.ScenePayload.Snapshot.EncounterId, combatantId, record.ScenePayload.Snapshot, detail, forceRefresh);
     }
 
@@ -1386,12 +1397,12 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     public void ScopeOptions_Resolve_Npc_Name_From_Catalog_When_NpcCode_Set()
     {
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
+        SetResources(BuildSkillMap(), catalog);
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
 
         const int playerId = 1001;
         const int npcInstanceId = 29994;
@@ -1420,13 +1431,13 @@ public sealed class CombatantDetailsFlyoutViewModelTests
     public void ScopeOptions_Resolve_Npc_Name_From_Archived_ScenePayload()
     {
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), catalog);
+        SetResources(BuildSkillMap(), catalog);
 
         var language = new LanguageService();
         using var localization = new LocalizationService(language);
-        var viewModel = new CombatantDetailsFlyoutViewModel(localization, new UiFrameBatchService());
+        var viewModel = CreateViewModel(localization);
         var archive = new EncounterArchiveService();
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         const int playerId = 1001;
@@ -1484,4 +1495,26 @@ public sealed class CombatantDetailsFlyoutViewModelTests
         Array.Sort(expectedCombatantIds);
         Assert.Equal(expectedCombatantIds, selectedIds);
     }
+
+    private void SetResources(
+        SkillDisplayCatalog skills,
+        IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
+        IReadOnlyDictionary<int, SkillBaseProjection>? projections = null,
+        IReadOnlyDictionary<uint, int>? effectSkillIds = null)
+    {
+        _displayResources?.Dispose();
+        _displayResources = null;
+        _clientContext = CombatResourceTestFixture.CreateContext(skills, npcCatalog, projections, effectSkillIds);
+    }
+
+    private GameResourceService GetDisplayResources()
+        => _displayResources ??= new GameResourceService(_clientContext, _clientContext.Resources.Language);
+
+    private CombatantDetailsFlyoutViewModel CreateViewModel(LocalizationService localization)
+        => new(localization, new UiFrameBatchService())
+        {
+            DisplayContext = new SceneDisplayContext(SceneIdentityScope.Empty, null, null, GetDisplayResources(), "Unknown")
+        };
+
+    public void Dispose() => _displayResources?.Dispose();
 }

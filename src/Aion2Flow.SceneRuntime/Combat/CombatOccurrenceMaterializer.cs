@@ -9,7 +9,8 @@ public static class CombatOccurrenceMaterializer
         int sourceId,
         int targetId,
         in CombatWireObservation observation,
-        in CombatOccurrenceResolution occurrence)
+        in CombatOccurrenceResolution occurrence,
+        CombatResourceRegistry? resources = null)
     {
         if (CombatContributionAdmission.IsSuppressedBeforeResolution(in occurrence))
             return default;
@@ -19,7 +20,8 @@ public static class CombatOccurrenceMaterializer
             targetId,
             in observation,
             in occurrence,
-            out var contribution);
+            out var contribution,
+            resources);
 
         return Resolve(sourceId, targetId, in observation, in occurrence, hasContribution, in contribution);
     }

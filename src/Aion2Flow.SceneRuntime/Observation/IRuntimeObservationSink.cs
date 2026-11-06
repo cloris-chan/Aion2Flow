@@ -6,6 +6,8 @@ namespace Cloris.Aion2Flow.SceneRuntime.Observation;
 
 public interface IRuntimeObservationSink
 {
+    SceneClientContext ClientContext { get; }
+
     int CurrentTarget { get; set; }
 
     int ResolveLifecycleId(int rawInstanceId);

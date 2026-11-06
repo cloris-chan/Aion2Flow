@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.SceneRuntime.Combat;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Projection;
 using Cloris.Aion2Flow.Services;
@@ -31,7 +32,7 @@ internal static class BossFocusDisplayBuilder
             var existingIndex = FindDisplayIndex(groups, displayKey);
             if (existingIndex < 0)
             {
-                groups.Add(new BossFocusDisplayGroup(displayKey, snapshot, npcCode, 1, ResolveShareEffectiveHp(npcCode, snapshot), displayObservedAtMilliseconds));
+                groups.Add(new BossFocusDisplayGroup(displayKey, snapshot, npcCode, 1, ResolveShareEffectiveHp(npcCode, snapshot, displayContext?.Resources.CombatResources), displayObservedAtMilliseconds));
                 continue;
             }
 
@@ -45,7 +46,7 @@ internal static class BossFocusDisplayBuilder
                 representative,
                 representativeNpcCode,
                 existing.InstanceCount + 1,
-                existing.EffectiveHp + ResolveShareEffectiveHp(npcCode, snapshot),
+                existing.EffectiveHp + ResolveShareEffectiveHp(npcCode, snapshot, displayContext?.Resources.CombatResources),
                 representativeObservedAtMilliseconds);
         }
     }
@@ -85,7 +86,7 @@ internal static class BossFocusDisplayBuilder
         return damage;
     }
 
-    public static long NormalizeHpForDisplay(NpcKind kind, int npcCode, long value)
+    public static long NormalizeHpForDisplay(NpcKind kind, int npcCode, long value, CombatResourceRegistry? resources = null)
     {
         if (value <= 0)
             return 0;
@@ -93,7 +94,7 @@ internal static class BossFocusDisplayBuilder
         if (kind != NpcKind.Boss)
             return value;
 
-        var divisor = ResolveHpDisplayDivisor(npcCode);
+        var divisor = ResolveHpDisplayDivisor(npcCode, resources ?? SceneClientContext.Purple.CombatResources);
         return divisor <= 1 ? value : (value + divisor / 2) / divisor;
     }
 
@@ -176,14 +177,14 @@ internal static class BossFocusDisplayBuilder
         return -1;
     }
 
-    private static long ResolveShareEffectiveHp(int npcCode, SceneBossFocusSnapshot boss)
+    private static long ResolveShareEffectiveHp(int npcCode, SceneBossFocusSnapshot boss, CombatResourceRegistry? resources)
         => boss.HasHp && boss.HasMaxHp && boss.EffectiveHp > 0
-            ? NormalizeHpForDisplay(boss.Kind, npcCode, boss.EffectiveHp)
+            ? NormalizeHpForDisplay(boss.Kind, npcCode, boss.EffectiveHp, resources)
             : 0;
 
-    private static int ResolveHpDisplayDivisor(int npcCode)
+    private static int ResolveHpDisplayDivisor(int npcCode, CombatResourceRegistry resources)
     {
-        if (npcCode > 0 && CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry))
+        if (npcCode > 0 && resources.TryResolveNpcCatalogEntry(npcCode, out var entry))
             return entry.HpDisplayDivisor;
 
         return 1;

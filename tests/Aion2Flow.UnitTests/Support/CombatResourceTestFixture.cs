@@ -1,4 +1,6 @@
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.Clients;
+using Cloris.Aion2Flow.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Tests.Support;
 
@@ -6,20 +8,20 @@ internal static class CombatResourceTestFixture
 {
     private static readonly ResourceCatalogSnapshot s_baseline = ResourceCatalog.Load(ResourceLanguage.English);
 
-    public static void SetResources(
+    public static SceneClientContext CreateContext(
         SkillDisplayCatalog skills,
         IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
         IReadOnlyDictionary<int, SkillBaseProjection>? skillBaseProjections = null,
         IReadOnlyDictionary<uint, int>? effectSkillIds = null)
     {
-        CombatResourceRegistry.SetGameResources(CreateSnapshot(skills, npcCatalog, skillBaseProjections, effectSkillIds));
+        return new SceneClientContext(ClientProfiles.Purple, CreateSnapshot(skills, npcCatalog, skillBaseProjections, effectSkillIds));
     }
 
-    private static ResourceCatalogSnapshot CreateSnapshot(
+    public static ResourceCatalogSnapshot CreateSnapshot(
         SkillDisplayCatalog skills,
         IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog,
-        IReadOnlyDictionary<int, SkillBaseProjection>? skillBaseProjections,
-        IReadOnlyDictionary<uint, int>? effectSkillIds)
+        IReadOnlyDictionary<int, SkillBaseProjection>? skillBaseProjections = null,
+        IReadOnlyDictionary<uint, int>? effectSkillIds = null)
     {
         var definitionsById = s_baseline.SkillDefinitions.ToDictionary(static definition => definition.SkillId);
         var skillNames = s_baseline.Skills.ToDictionary(static skill => skill.SkillId, static skill => skill.Name);

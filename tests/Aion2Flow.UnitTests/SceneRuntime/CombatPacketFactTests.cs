@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Canonicalization;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -10,13 +11,15 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 public class CombatPacketFactTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     public CombatPacketFactTests()
-        => CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
+        => _clientContext = CombatResourceTestFixture.CreateContext([], new Dictionary<int, NpcDisplayEntry>());
 
     [Fact]
     public void ScenePath_ClassifiesCompactControlDirectRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
@@ -38,7 +41,7 @@ public class CombatPacketFactTests
         const int playerId = 15931;
         const int skillCode = 18720001;
         const int marker = 77;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
@@ -95,7 +98,7 @@ public class CombatPacketFactTests
         const int playerId = 15931;
         const int skillCode = 18720001;
         const int marker = 77;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
@@ -119,7 +122,7 @@ public class CombatPacketFactTests
     public void ScenePath_ExposesProductionCanonicalOccurrenceToResearchObserver()
     {
         const int playerId = 15931;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, playerId, 18720001, marker: 77, mode: 0, flag: 0, echoSourceId: playerId));
         journal.Append(CreateDirectValue(sceneId, 1, playerId, playerId, 18720001, marker: 77, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 566, detailRef: 1872000111));
@@ -148,7 +151,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesOutOfOrderCompactControlDirectRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
         journal.Append(CreateCompactControlOpener(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
@@ -167,7 +170,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesCompactControlDirectRecoveryAcrossFrameEntryScopes()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048, scopeId: 101));
         journal.Append(CreateCompactControlOpener(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972, scopeId: 102));
@@ -183,7 +186,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesSelfCompactControlDirectRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
         journal.Append(CreateCompactControlOpener(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
@@ -203,7 +206,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesCompactControlDirectRecoveryWithVariableValueUnknownAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 3013, bodyCodeRaw: 17121351, marker: 41, mode: 0, flag: 0, echoSourceId: 3013));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 3013, targetId: 3013, bodyCodeRaw: 17121351, marker: 41, layoutTag: 4, flag: 0, type: 2, chainId: 17503, damage: 8627));
@@ -225,7 +228,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesType12CompactControlDirectRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17100140, marker: 186, mode: 12, flag: 0, echoSourceId: 8972));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17100140, marker: 186, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 3324, loop: 2));
@@ -246,7 +249,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesMode8CompactControlDirectRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17100140, marker: 186, mode: 8, flag: 0, echoSourceId: 8972));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17100140, marker: 186, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 3324, loop: 2));
@@ -267,7 +270,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyClosedOpenerTargetValueAsRecoveryWithoutPacketEvidence()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
         journal.Append(CreateCompactControlCloser(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, flag: 0));
@@ -287,7 +290,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_CloserRetiresMatchedRecoveryOpener()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 1024));
@@ -307,7 +310,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_CompactControlCloseWithDifferentBodyCodeIsIgnored()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17800001, marker: 193, mode: 0, flag: 0, echoSourceId: 8972));
         journal.Append(CreateCompactControlCloser(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17800002, marker: 193, flag: 0));
@@ -324,7 +327,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesInlineSidecarCompactControlRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17121351, marker: 43, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 7761));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 12632, bodyCodeRaw: 17121351, marker: 43, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 9003));
@@ -350,7 +353,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesInlineSidecarRecoveryWhenSidecarPrecedesTargetValue()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17121351, marker: 43, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 5425));
         journal.Append(CreateInlineSidecar(sceneId, 1, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17121351, marker: 43, type: 2));
@@ -367,7 +370,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_InlineSidecarAssociationDoesNotCrossCompletedFlush()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 8972, bodyCodeRaw: 17121351, marker: 43, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 5425, flushId: 100));
@@ -390,7 +393,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesSamePayloadSelfValueRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 12613, targetId: 8062, bodyCodeRaw: 17100140, marker: 1, layoutTag: 4, flag: 0, type: 2, chainId: 19006, damage: 2694, loop: 1, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 500, leafScopeId: 501, siblingIndex: 12)));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 12613, targetId: 12613, bodyCodeRaw: 17100140, marker: 1, layoutTag: 4, flag: 0, type: 2, chainId: 19006, damage: 2305, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 500, leafScopeId: 502, siblingIndex: 13)));
@@ -411,7 +414,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesSamePayloadLoop2SelfPairRecoveryAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 3432, loop: 2, detailRef: 1710004011, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 510, leafScopeId: 511, siblingIndex: 142)));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 7023, targetId: 7023, bodyCodeRaw: 17101450, marker: 78, layoutTag: 4, flag: 0, type: 2, chainId: 16694, damage: 4087, loop: 2, detailRef: 1710004012, structurePath: CreateCompressedPayloadStructurePath(compressedScopeId: 510, leafScopeId: 512, siblingIndex: 143)));
@@ -429,7 +432,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_ClassifiesInlineSelfRecoveryAfterNonRecoveryControlOpenerAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 2141, bodyCodeRaw: 12350150, marker: 29, mode: 0, flag: 2, echoSourceId: 30058));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 2141, targetId: 2141, bodyCodeRaw: 12350150, marker: 29, layoutTag: 4, flag: 0, type: 2, chainId: 16959, damage: 2673, loop: 2));
@@ -465,7 +468,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyInlineSidecarDirectDamageWithoutSelfEvidenceAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 144994, bodyCodeRaw: 17730001, marker: 194, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2519));
         journal.Append(CreateInlineSidecar(sceneId, 1, sourceId: 8972, targetId: 144994, bodyCodeRaw: 17730001, marker: 194, type: 2));
@@ -481,7 +484,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyUnmatchedLoop2DirectDamageAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 144994, bodyCodeRaw: 17010230, marker: 189, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 5629, loop: 2));
 
@@ -496,7 +499,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_FlushesUnmatchedCompactDirectValueAsDamage()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 5578, bodyCodeRaw: 17800001, marker: 193, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2048));
 
@@ -511,7 +514,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyOutOfOrderTargetEchoCompactControlDamageAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateDirectValue(sceneId, 0, sourceId: 8972, targetId: 144994, bodyCodeRaw: 17730001, marker: 194, layoutTag: 4, flag: 0, type: 2, chainId: 16702, damage: 2519));
         journal.Append(CreateCompactControlOpener(sceneId, 1, sourceId: 8972, bodyCodeRaw: 17730001, marker: 194, mode: 0, flag: 0, echoSourceId: 144994));
@@ -527,7 +530,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyTargetedCompactControlDirectDamageAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 8972, bodyCodeRaw: 17730001, marker: 194, mode: 0, flag: 0, echoSourceId: 144994));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 8972, targetId: 144994, bodyCodeRaw: 17730001, marker: 194, layoutTag: 6, flag: 0, type: 2, chainId: 16702, damage: 2519));
@@ -553,7 +556,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_DoesNotClassifyNonRecoveryShapeWithSourceEchoAsHealing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactControlOpener(sceneId, 0, sourceId: 12632, bodyCodeRaw: 13120240, marker: 196, mode: 0, flag: 2, echoSourceId: 12632));
         journal.Append(CreateDirectValue(sceneId, 1, sourceId: 12632, targetId: 161904, bodyCodeRaw: 13120240, marker: 196, layoutTag: 20, flag: 0, type: 3, chainId: 21678, damage: 52763));
@@ -579,7 +582,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_PreservesParserAuthoritativeMultiHitFact()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         journal.Append(new ObservedEventTestEntry<CombatWireObservation>(
             new ObservedEventHeader(
                 Guid.NewGuid(),
@@ -627,7 +630,7 @@ public class CombatPacketFactTests
     [Fact]
     public void ScenePath_PreservesAdjacentRepeatedCompactAvoidanceEventsWithSameKey()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.Append(CreateCompactAvoidanceSignal(sceneId, 0, sourceId: 31338, targetId: 2141, bodyCodeRaw: 1603150, marker: 23, layoutTag: 2, scopeId: 101, flushId: 100));
         journal.Append(CreateCompactAvoidanceSignal(sceneId, 1, sourceId: 31338, targetId: 2141, bodyCodeRaw: 1603150, marker: 23, layoutTag: 0, scopeId: 102, flushId: 101));
@@ -767,7 +770,7 @@ public class CombatPacketFactTests
     private static CombatStore Apply(ObservedEventJournal journal, ICombatOccurrenceObserver observer)
     {
         var combat = new CombatStore();
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer, journal.ClientContext);
         applier.ApplyJournal(journal);
         return combat;
     }
@@ -778,7 +781,7 @@ public class CombatPacketFactTests
     private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics, out ResourceStore resources)
     {
         var combat = new CombatStore();
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, clientContext: journal.ClientContext);
         applier.ApplyJournal(journal);
         mechanics = applier.Mechanics;
         resources = applier.Resources;

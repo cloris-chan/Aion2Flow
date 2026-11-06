@@ -18,19 +18,23 @@ public sealed class DomainEventApplier
     private readonly ResourceStore _resources;
     private readonly ICombatOccurrenceObserver? _combatOccurrenceObserver;
     private readonly IAuraLifecycleObserver? _auraLifecycleObserver;
-    private readonly CombatContributionPathResolver _contributionPathResolver = new(CombatContributionPath.ProductionFallback);
+    private readonly CombatContributionPathResolver _contributionPathResolver;
+    private readonly SceneClientContext _clientContext;
     private readonly SystemPeriodicRecoveryCanonicalizer _systemPeriodicRecovery = new();
     private readonly PeriodicPoolCanonicalizer _periodicPool = new();
     private readonly CompactDirectValueCanonicalizer _compactDirectValue = new();
     private readonly OwnerTargetSummonResourceCanonicalizer _ownerTargetSummonResource;
     private readonly CompactAvoidanceCanonicalizer _compactAvoidance = new();
     private readonly EntityVitalStore _entityVitals = new();
-    private readonly AuraStore _auras = new();
+    private readonly AuraStore _auras;
     private readonly BossFocusStore _bossFocus;
     private readonly Func<int, bool> _bossFocusActivitySourcePredicate;
 
-    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null)
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, RuntimeMetadataRegistry metadataRegistry, CombatStore combat, ICombatOccurrenceObserver? combatOccurrenceObserver = null, IAuraLifecycleObserver? auraLifecycleObserver = null, SceneClientContext? clientContext = null)
     {
+        _clientContext = clientContext ?? SceneClientContext.Purple;
+        _contributionPathResolver = new(CombatContributionPath.ProductionFallback, _clientContext.CombatResources);
+        _auras = new(resources: _clientContext.CombatResources);
         _entities = entities;
         _boundary = boundary;
         _metadataRegistry = metadataRegistry;
@@ -44,18 +48,18 @@ public sealed class DomainEventApplier
         _bossFocusActivitySourcePredicate = IsBossFocusActivitySource;
     }
 
-    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat)
-        : this(entities, boundary, new RuntimeMetadataRegistry(), combat)
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, SceneClientContext? clientContext = null)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, clientContext: clientContext)
     {
     }
 
-    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ICombatOccurrenceObserver combatOccurrenceObserver)
-        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, combatOccurrenceObserver)
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ICombatOccurrenceObserver combatOccurrenceObserver, SceneClientContext? clientContext = null)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, combatOccurrenceObserver, clientContext: clientContext)
     {
     }
 
-    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ISceneEventObserver sceneEventObserver)
-        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, sceneEventObserver, sceneEventObserver)
+    public DomainEventApplier(EntityStore entities, SceneBoundaryStore boundary, CombatStore combat, ISceneEventObserver sceneEventObserver, SceneClientContext? clientContext = null)
+        : this(entities, boundary, new RuntimeMetadataRegistry(), combat, sceneEventObserver, sceneEventObserver, clientContext)
     {
     }
 
@@ -292,7 +296,7 @@ public sealed class DomainEventApplier
         if (materialization.Contribution is { } contribution)
         {
             if (applyClassEvidence)
-                _entities.ApplyCharacterClassEvidence(sourceId, in observation, in contribution);
+                _entities.ApplyCharacterClassEvidence(sourceId, in observation, in contribution, _clientContext.CombatResources);
             _combat.ApplyCombat(sourceId, targetId, in observation, in contribution, observedAtMilliseconds, sourceObservationOrdinal, raw);
         }
 

@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/955dc75a-6dcc-487f-9081-ed9434895b36
 - Overlay 直接顯示擷取狀態與遊戲來回延遲。
 - 支援互動、點擊穿透與隱藏三種顯示模式，並可設定顯示模式與戰鬥重置的全域快捷鍵。
 - 可調整 UI 縮放、置頂行為、顯示列數、排序方式、數值欄位、精簡數字與玩家名稱顯示。
-- 介面與遊戲資料顯示支援繁體中文、English 與 한국어。
+- 介面支援繁體中文、English 與 한국어，可獨立於遊戲資源語言設定。PURPLE 資源支援這三種語言；Steam 資源支援英文、韓文、德文、西班牙文、法文、日文、葡萄牙文與俄文。
 - 由 Velopack 管理的發行版本會自動檢查並下載更新。
 
 ## 系統需求
@@ -52,6 +52,7 @@ https://github.com/user-attachments/assets/955dc75a-6dcc-487f-9081-ed9434895b36
 
 1. 下載最新版本；若下載的是壓縮檔，請先解壓縮。
 2. 啟動 `Aion2Flow.exe`，並接受 Windows 的系統管理員權限提示。
+   在「設定 → 遊戲客戶端」選擇 **PURPLE（韓服／臺服）** 或 **Steam**。切換時會自動歸檔目前場景並套用新客戶端，無須重新啟動程式。資源語言跟隨客戶端版本，介面語言另外設定。
 3. 啟動 AION 2。Aion2Flow 會等待 `Aion2.exe`、偵測目前的遊戲連線，並在收到戰鬥資料後開始更新。
 4. 若沒有顯示資料，請查看 Overlay 底部的三個狀態指示：擷取驅動、遊戲連接埠與戰鬥連線。
 
@@ -93,22 +94,9 @@ src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 
 ## 目前限制
 
+- Steam 支援已確認的地圖載入與實例切換、NPC 身分與血量、明確的召喚物主人關係、常見戰鬥記錄、玩家資料與來回延遲。組隊／部隊資料及其他尚未確認的協議布局仍未支援。
 - 實驗性回放與戰鬥歷史只適用於本次程式執行期間擷取的戰鬥。
 - 若在遊戲啟動後才啟動 Aion2Flow，可能因錯過初始資料而暫時無法顯示部分名稱、圖示、Boss 血量或場景名稱；返回角色選擇畫面並重新進入遊戲，或進行任意一次傳送，即可重新取得資料。若內附顯示資料尚未隨遊戲更新，相關內容仍可能缺失。
 - 遊戲更新可能改變戰鬥資料並暫時影響統計；大型客戶端更新後請安裝最新的 Aion2Flow 版本。
 
 本專案與 NCSOFT 或任何 AION 2 發行商沒有從屬、背書或贊助關係。
-
-## 贊助
-
-如果 Aion2Flow 對你有幫助，可以透過 Ko-fi 或微信讚賞支持開發。
-
-<p>
-  <a href="https://ko-fi.com/cloris">
-    <img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg">
-  </a>
-</p>
-
-<p>
-  <img alt="微信讚賞碼" src="https://raw.githubusercontent.com/cloris-chan/.github/main/assets/sponsors/wechat-reward.png" width="180">
-</p>

@@ -45,7 +45,7 @@ public sealed class ScenePlaybackTrackIndex
             return new ScenePlaybackTrackIndex(startObservationOrdinal, endObservationOrdinalExclusive, segment.IsLiveGrowing, [], [], []);
 
         var fixedSegment = new SceneJournalSegment(segment.Journal, startObservationOrdinal, endObservationOrdinalExclusive, IsLiveGrowing: false);
-        var projection = SceneProjectionState.Create(Guid.Empty, observationCount);
+        var projection = SceneProjectionState.Create(Guid.Empty, observationCount, clientContext: segment.ClientContext);
         var indexedMarkers = new List<IndexedTrackMarker>(observationCount);
         var cursor = fixedSegment.CreateCursor();
         var observationIndex = 0;

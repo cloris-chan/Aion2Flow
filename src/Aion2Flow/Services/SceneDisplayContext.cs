@@ -15,7 +15,7 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
     public SceneIdentityScope IdentityScope { get; } = identityScope;
     public RuntimeMetadataRegistry? MetadataRegistry { get; } = metadataRegistry;
     public SceneCombatSnapshot Snapshot { get; } = snapshot ?? SceneCombatSnapshot.Empty;
-    public GameResourceService Resources { get; } = resources;
+    public GameResourceService Resources { get; } = resources.GetForClient(snapshot?.ClientContext ?? resources.ClientContext);
     public string UnknownSceneName { get; } = string.IsNullOrWhiteSpace(unknownSceneName) ? "Scene_Unknown" : unknownSceneName;
 
     public string ResolveEntityName(int entityId)
@@ -208,7 +208,7 @@ public sealed class SceneDisplayContext(SceneIdentityScope identityScope, Runtim
     public string ResolveSkillName(int skillCode) => skillCode > 0 ? Resources.ResolveSkillName(skillCode) : string.Empty;
 
     public string ResolveSkillName(ResourceEffectRef effectRef)
-        => CombatResourceRegistry.TryResolveSkillIdByEffectRef(effectRef, out var skillId)
+        => Resources.CombatResources.TryResolveSkillIdByEffectRef(effectRef, out var skillId)
             ? Resources.ResolveSkillName(skillId)
             : string.Empty;
 

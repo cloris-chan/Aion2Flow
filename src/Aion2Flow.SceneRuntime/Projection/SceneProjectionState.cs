@@ -15,7 +15,8 @@ internal sealed class SceneProjectionState
         Guid encounterId,
         int combatInitialCapacity = 0,
         ICombatOccurrenceObserver? combatOccurrenceObserver = null,
-        IAuraLifecycleObserver? auraLifecycleObserver = null)
+        IAuraLifecycleObserver? auraLifecycleObserver = null,
+        SceneClientContext? clientContext = null)
         => new(
             encounterId,
             new EntityStore(),
@@ -23,7 +24,8 @@ internal sealed class SceneProjectionState
             new RuntimeMetadataRegistry(),
             combatInitialCapacity > 0 ? new CombatStore(combatInitialCapacity) : new CombatStore(),
             combatOccurrenceObserver,
-            auraLifecycleObserver);
+            auraLifecycleObserver,
+            clientContext);
 
     public SceneProjectionState(
         Guid encounterId,
@@ -32,8 +34,10 @@ internal sealed class SceneProjectionState
         RuntimeMetadataRegistry metadataRegistry,
         CombatStore combat,
         ICombatOccurrenceObserver? combatOccurrenceObserver = null,
-        IAuraLifecycleObserver? auraLifecycleObserver = null)
+        IAuraLifecycleObserver? auraLifecycleObserver = null,
+        SceneClientContext? clientContext = null)
     {
+        ClientContext = clientContext ?? SceneClientContext.Purple;
         EncounterId = encounterId;
         Entities = entities;
         Boundary = boundary;
@@ -45,6 +49,8 @@ internal sealed class SceneProjectionState
     }
 
     public Guid EncounterId { get; private set; }
+
+    public SceneClientContext ClientContext { get; }
 
     public EntityStore Entities { get; }
 
@@ -67,7 +73,8 @@ internal sealed class SceneProjectionState
             Applier.Resources,
             Boundary,
             Applier.BossFocus,
-            EncounterId);
+            EncounterId,
+            ClientContext);
 
     private ICombatOccurrenceObserver? CombatOccurrenceObserver { get; }
 
@@ -100,7 +107,8 @@ internal sealed class SceneProjectionState
             MetadataRegistry,
             Combat,
             CombatOccurrenceObserver,
-            AuraLifecycleObserver)
+            AuraLifecycleObserver,
+            ClientContext)
         {
             TrackBossFocus = trackBossFocus,
             CombatantStatisticsScope = _combatantStatisticsScope

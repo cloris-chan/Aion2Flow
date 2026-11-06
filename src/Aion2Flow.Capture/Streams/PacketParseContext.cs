@@ -5,6 +5,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 internal ref struct PacketParseContext(
     IRuntimeObservationSink sink,
     SceneObservationWriter writer,
+    ClientPacketProtocol protocol,
     PacketFlushState flushState,
     PacketPlayerGroupState playerGroupState,
     Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
@@ -14,6 +15,7 @@ internal ref struct PacketParseContext(
 {
     public readonly IRuntimeObservationSink Sink = sink;
     public readonly SceneObservationWriter Writer = writer;
+    public readonly ClientPacketProtocol Protocol = protocol;
     public readonly TcpConnection Connection = connection;
     public readonly long TimestampMilliseconds = timestamp.TimelineUnixMilliseconds;
     public readonly long ArrivalTimestamp = timestamp.ArrivalTimestamp;

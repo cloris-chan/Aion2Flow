@@ -6,6 +6,7 @@
     <File Path="README.zh-TW.md" />
   </Folder>
   <Project Path="src/Aion2Flow.Resources/Aion2Flow.Resources.csproj" />
+  <Project Path="src/Aion2Flow.Clients/Aion2Flow.Clients.csproj" />
   <Project Path="src/Aion2Flow.Protocol/Aion2Flow.Protocol.csproj" />
   <Project Path="src/Aion2Flow.SceneRuntime/Aion2Flow.SceneRuntime.csproj" />
   <Project Path="src/Aion2Flow.Capture/Aion2Flow.Capture.csproj" />

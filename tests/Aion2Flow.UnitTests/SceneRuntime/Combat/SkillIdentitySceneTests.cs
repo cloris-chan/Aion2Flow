@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.Clients;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -7,10 +9,12 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class SkillIdentitySceneTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Journal_Keeps_Confirmed_Specialization_Variant_As_Wire_Identity()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -30,7 +34,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Does_Not_Infer_SkillCode_From_ResourceEffectRef()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(17750000, "Immortal Veil", SkillCategory.Chanter, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -53,8 +57,8 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Keeps_Confirmed_Variant_As_Packet_Identity_And_Uses_Resources_Only_For_Display()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
+        using var scene = new SceneTestHarness(_clientContext);
         const int sourceId = 3632;
         const int targetId = 19621;
 
@@ -67,7 +71,7 @@ public sealed class SkillIdentitySceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetBySkillCode(17040257, out var skill));
-        Assert.Equal("天罰", CombatResourceRegistry.DisplaySkillNameFor(skill.SkillCode));
+        Assert.Equal("天罰", _clientContext.CombatResources.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(77282, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -75,8 +79,8 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Keeps_Exact_Known_Confirmed_Skill_Code()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
+        using var scene = new SceneTestHarness(_clientContext);
         const int sourceId = 3632;
         const int targetId = 19621;
 
@@ -89,7 +93,7 @@ public sealed class SkillIdentitySceneTests
         Assert.True(snapshot.Combatants.TryGetValue(sourceId, out _));
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetBySkillCode(17040250, out var skill));
-        Assert.Equal("審判之電", CombatResourceRegistry.DisplaySkillNameFor(skill.SkillCode));
+        Assert.Equal("審判之電", _clientContext.CombatResources.DisplaySkillNameFor(skill.SkillCode));
         Assert.Equal(18816, skill.DamageAmount);
         Assert.Equal(2, skill.Times);
     }
@@ -97,7 +101,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Keeps_SameName_PcSkill_Variants_As_Distinct_Packet_Identities()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(12240000, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
             new SkillDisplayEntry(12240030, "審判", SkillCategory.Templar, SkillSourceType.PcSkill),
@@ -108,7 +112,7 @@ public sealed class SkillIdentitySceneTests
             [12240039] = new(12240039, 12240000)
         });
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int sourceId = 3038;
         const int targetId = 29219;
 
@@ -122,8 +126,8 @@ public sealed class SkillIdentitySceneTests
         var skills = scene.CreateSkillBreakdown(snapshot, sourceId).Skills;
         Assert.True(skills.TryGetBySkillCode(12240350, out var specialized));
         Assert.True(skills.TryGetBySkillCode(12240039, out var variantState));
-        Assert.Equal("審判", CombatResourceRegistry.DisplaySkillNameFor(specialized.SkillCode));
-        Assert.Equal("審判", CombatResourceRegistry.DisplaySkillNameFor(variantState.SkillCode));
+        Assert.Equal("審判", _clientContext.CombatResources.DisplaySkillNameFor(specialized.SkillCode));
+        Assert.Equal("審判", _clientContext.CombatResources.DisplaySkillNameFor(variantState.SkillCode));
         Assert.Equal(23108, specialized.DamageAmount);
         Assert.Equal(15957, variantState.DamageAmount);
         Assert.Equal(1, specialized.Times);
@@ -133,12 +137,12 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Attributes_Drain_Heal_To_Confirmed_Skill_Code()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(13060250, "Ambush", SkillCategory.Assassin, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 3406;
         const int npcId = 17629;
 
@@ -172,9 +176,9 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void ResourceKind_Health_Classifies_Confirmed_Skill_As_Healing_Without_Damage_Total()
     {
-        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext([], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 9024;
         const int targetId = 262851;
 
@@ -205,12 +209,12 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void NoSkill_Direct_Events_Group_By_ResourceEffectRefs_With_Fallback_Label()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(17000000, "Should not be used", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int sourceId = 100;
         const int targetId = 200;
         var body = ResourceEffectRef.FromRaw(1700000011);
@@ -250,12 +254,12 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Compact0438_Body_Code_Is_Stored_As_Skill_Code()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(1218810, "攻擊", SkillCategory.Npc, SkillSourceType.ClientSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         const int sourceId = 100;
         const int targetId = 200;
@@ -276,7 +280,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Compact0238_Body_Code_Is_Stored_As_Packet_Raw_Body_Code_Not_Skill_Code()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         var source = new PacketObservationSource(1_000, 1, 0x0238, 16, 0, default);
 
@@ -294,7 +298,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Compact0238_Cooldown_Is_Journaled_When_Extended_Observations_Are_Disabled()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sessionId = Guid.NewGuid();
         var sink = new JournalingRuntimeObservationSink(
             journal,
@@ -319,7 +323,7 @@ public sealed class SkillIdentitySceneTests
     [Fact]
     public void Compact0638_Body_Code_Is_Stored_As_ResourceEffectRef_Not_Skill_Code()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         var source = new PacketObservationSource(1_000, 1, 0x0638, 16, 0, default);
         var effectRef = ResourceEffectRef.FromRaw(30011101);
@@ -334,12 +338,12 @@ public sealed class SkillIdentitySceneTests
         Assert.Equal(30011101u, combat.BodyResourceEffectRef.RawId);
     }
 
-    private static CombatWireObservation JournalObservation(
+    private CombatWireObservation JournalObservation(
         int sourceId,
         int targetId,
         in CombatWireObservation observation)
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sink = new JournalingRuntimeObservationSink(journal, new SceneRuntimeClock(0), Guid.NewGuid());
         var source = new PacketObservationSource(1_000, 1, 0x0438, 0, 0, default);
         sink.AppendCombatWireObservation(in source, sourceId, targetId, in observation);

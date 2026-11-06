@@ -1,10 +1,13 @@
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
 public sealed class SkillDetailBaseAggregatorTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void AddOrMerge_Merges_Generated_Base_Group()
     {
@@ -91,7 +94,7 @@ public sealed class SkillDetailBaseAggregatorTests
             new SkillBaseProjection(16330027, 16330000),
             new SkillBaseProjection(19010047, 19010000));
 
-        var key = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default));
+        var key = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default), _clientContext.CombatResources);
 
         Assert.Equal(expectedBaseSkillCode, key.SkillCode);
     }
@@ -106,7 +109,7 @@ public sealed class SkillDetailBaseAggregatorTests
     {
         SetSkillBaseProjections();
 
-        var key = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default));
+        var key = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default), _clientContext.CombatResources);
 
         Assert.Equal(skillCode, key.SkillCode);
     }
@@ -118,7 +121,7 @@ public sealed class SkillDetailBaseAggregatorTests
 
         var actionKey = new CombatEventKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));
 
-        var key = SkillBaseKey.FromEventKey(actionKey);
+        var key = SkillBaseKey.FromEventKey(actionKey, _clientContext.CombatResources);
 
         Assert.Equal(actionKey, key.EventKey);
     }
@@ -136,14 +139,14 @@ public sealed class SkillDetailBaseAggregatorTests
 
         var actionKey = new CombatEventKey(0, ResourceEffectRef.FromRaw(1234), ResourceEffectRef.FromRaw(5678));
 
-        var key = SkillBaseKey.FromEventKey(actionKey);
+        var key = SkillBaseKey.FromEventKey(actionKey, _clientContext.CombatResources);
 
         Assert.Equal(new CombatEventKey(16300000, default, default), key.EventKey);
     }
 
-    private static SkillDetailRowData CreateRow(int skillCode, long amount, int hits, int eventCount = 1)
+    private SkillDetailRowData CreateRow(int skillCode, long amount, int hits, int eventCount = 1)
     {
-        var baseKey = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default));
+        var baseKey = SkillBaseKey.FromEventKey(new CombatEventKey(skillCode, default, default), _clientContext.CombatResources);
         return new SkillDetailRowData
         {
             BaseKey = baseKey,
@@ -157,12 +160,12 @@ public sealed class SkillDetailBaseAggregatorTests
         };
     }
 
-    private static void SetSkillBaseProjections(params SkillBaseProjection[] projections)
+    private void SetSkillBaseProjections(params SkillBaseProjection[] projections)
         => SetSkillBaseResources(projections, new Dictionary<uint, int>());
 
-    private static void SetSkillBaseResources(SkillBaseProjection[] projections, IReadOnlyDictionary<uint, int> effectSkillIds)
+    private void SetSkillBaseResources(SkillBaseProjection[] projections, IReadOnlyDictionary<uint, int> effectSkillIds)
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
             [],
             new Dictionary<int, NpcDisplayEntry>(),
             projections.ToDictionary(static projection => projection.SkillCode),

@@ -31,7 +31,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_Observer_Receives_Production_Occurrences_After_Initial_Reset()
     {
-        SetResources();
         var observer = new RecordingSceneEventObserver();
 
         var replay = PacketLogReplayService.Replay(
@@ -229,7 +228,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void ReplayMany_20260810_CrossServerLifecycle_PreservesMapContextsAndCombat()
     {
-        SetResources();
 
         var paths = ReplayScenarioCatalog.CurrentCrossServerLifecycle
             .Select(static fileName => FixtureHelper.GetPath($"logs/{fileName}"))
@@ -331,7 +329,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260702031011_Parses_Current0438_Damage_And_Modifier_Layout()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentAssassinDirectDamage}"));
 
@@ -357,7 +354,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260909150745_Resolves_Current4136_NpcIdentities()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNpcIdentityLayout}"));
 
@@ -373,7 +369,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260909214537_Resolves_Current4136_SummonOwnership()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentSummonOwnershipLayout}"));
 
@@ -395,7 +390,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260909222525_Resolves_Current4136_NamedSummonOwnership()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNamedSummonOwnershipLayout}"));
 
@@ -405,7 +399,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260909232117_Resolves_Current4136_ElementalistSummonOwnership()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentElementalistSummonOwnershipLayout}"));
 
@@ -432,7 +425,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260910001840_Resolves_Current4136_DirectMode1FSummonOwnership()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentDirectMode1FSummonOwnershipLayout}"));
 
@@ -443,7 +435,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260912203027_Resolves_Current4136_DirectMode1F10SummonOwnership()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentDirectMode1F10SummonOwnershipLayout}"));
 
@@ -466,7 +457,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260702054027_Applies_Current3336_SelfIdentity()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerRegenerationRecovery}"));
 
@@ -484,7 +474,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260703041828_Applies_Extended3336_SelfIdentity_Without4536()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentBrawlerExtendedSelfIdentity}"));
         var entries = ReadAllJournalEntries(replay);
@@ -505,7 +494,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260705015611_Applies_CrossServer3336_SelfIdentityMarker3F()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentCrossServerSelfIdentityMarker3F}"));
         var entries = ReadAllJournalEntries(replay);
@@ -535,7 +523,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260809021609_ParsesFixed32CrossServerIdentityAndCombat()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentFixed32CrossServerCombat}"));
 
@@ -564,7 +551,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260809050345_ParsesChargeCooldownAndRowBaseUpdates()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentChargeCooldown}"));
         var entries = ReadAllJournalEntries(replay);
@@ -616,7 +602,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260704202443_Applies_Current4536_Marker17PcProfiles()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentNearbyPcProfilesMarker17}"));
 
@@ -628,7 +613,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260702200648_Parses_CurrentPartyAndForceMemberRelations()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentPartyForceRelation}"));
 
@@ -665,7 +649,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260712211428_RecognizesPartyMembersFromEarlyStatusFrames()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentPartyStatusRelation}"));
         var entries = ReadAllJournalEntries(replay);
@@ -708,7 +691,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260715000443_ParsesCompleteTenPlayerForceRosterSnapshot()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentTenPlayerForceRoster}"));
         var entries = ReadAllJournalEntries(replay);
@@ -734,7 +716,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260704005035_Parses_ForceDungeonInitialRelations()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonInitialRelation}"));
         var entries = ReadAllJournalEntries(replay);
@@ -764,7 +745,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260704010004_KeepsActivityDungeonPlayersIndependent()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentActivityDungeonIndependentPlayers}"));
         var entries = ReadAllJournalEntries(replay);
@@ -779,7 +759,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260704153057_Parses_ForceRosterProfilesWithoutSceneIds()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentForceDungeonPreInstanceRoster}"));
         var entries = ReadAllJournalEntries(replay);
@@ -795,7 +774,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260702183936_Parses_Current0438_Defensive_Modifier_Totals()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentClericDefensiveModifierTotals}"));
 
@@ -828,7 +806,6 @@ public sealed class PacketLogReplayServiceTests
     [Fact]
     public void Replay_20260702190835_Parses_Current0438_Damage_Without_Identity_Metadata()
     {
-        SetResources();
 
         var replay = PacketLogReplayService.Replay(FixtureHelper.GetPath($"logs/{ReplayScenarioCatalog.CurrentClericDamageWithoutIdentity}"));
 
@@ -871,7 +848,6 @@ public sealed class PacketLogReplayServiceTests
         AssertMetric(incomingHits.Sum(static packet => CountHitsWith(packet, DamageModifiers.Regeneration)), 1, "regeneration", dump);
     }
 
-    private static void SetResources() => CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.TraditionalChinese));
 
     private static IReadOnlyList<DirectMapEventObservation> ReadDirectMapEventObservations(
         PacketLogReplayResult replay,

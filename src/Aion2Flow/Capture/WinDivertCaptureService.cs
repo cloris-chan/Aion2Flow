@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 using Cloris.Aion2Flow.Services;
@@ -15,13 +16,15 @@ using Cloris.Aion2Flow.WinDivert.Network;
 
 namespace Cloris.Aion2Flow.Capture;
 
-public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processPortDiscoveryService) : IAsyncDisposable
+public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processPortDiscoveryService, ClientSettingsService? clientSettingsService = null, SceneClientContext? clientContext = null) : IAsyncDisposable
 {
     private WinDivertSession? _divert;
     private CancellationTokenSource? _cts;
     private Task? _worker;
+    private PacketCaptureDispatcher? _dispatcher;
+    private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly ProtocolRoundTripEstimator _protocolRttEstimator = new();
-    private readonly TcpWorldConnectionCandidateTracker _candidateConnections = new();
+    private TcpWorldConnectionCandidateTracker _candidateConnections = new(clientContext?.Profile ?? clientSettingsService?.CurrentProfile ?? ClientProfiles.Purple);
     private readonly TcpDownstreamConnectionTracker _downstreamConnections = new();
     private readonly PendingPromotionRegistry _pendingPromotions = new();
     private readonly CaptureTimestampMapper _captureTimestampMapper = new();
@@ -30,12 +33,13 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
     private long _nextCaptureOrdinal;
 
     private readonly ProcessPortDiscoveryService _processPortDiscoveryService = processPortDiscoveryService;
-    private readonly SceneLiveReadModel _scene = new(RawPacketDump.CurrentSessionStarted);
-    private Func<IRuntimeObservationSink> RuntimeSinkFactory { get => field ??= SceneSinkFactory.CreateForLive(_scene); }
+    private SceneLiveReadModel _scene = new(
+        RawPacketDump.CurrentSessionStarted,
+        clientContext ?? SceneClientContext.Create(clientSettingsService?.CurrentProfile ?? ClientProfiles.Purple));
     public PacketCaptureDispatcher Dispatcher
     {
-        get => field ??= new(
-            RuntimeSinkFactory,
+        get => _dispatcher ??= new(
+            SceneSinkFactory.CreateForLive(_scene),
             OnProtocolRoundTripObserved,
             OnCaptureConnectionLocked,
             null,
@@ -67,8 +71,23 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
     public async Task StartAsync()
     {
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            await StartCoreAsync();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StartCoreAsync()
+    {
         if (_divert is not null)
             return;
+
+        RawPacketDump.ConfigureClientContext(_scene.ClientContext);
 
         CaptureConnectionGate.Unlock();
         _pendingPromotions.CancelAll();
@@ -88,7 +107,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         }
         catch (Win32Exception ex)
         {
-            await StopAsync();
+            await StopCoreAsync();
             var message = $"WinDivert error: {ex.Message}";
             AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
             PublishStatus(message, isError: true);
@@ -96,7 +115,7 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         }
         catch (Exception ex)
         {
-            await StopAsync();
+            await StopCoreAsync();
             var message = $"Failed to start capture: {ex.Message}";
             AppLog.Write(AppLogLevel.Error, $"{message}{Environment.NewLine}{ex}");
             PublishStatus(message, isError: true);
@@ -606,14 +625,57 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
         return ordinal;
     }
 
+    public async Task SwitchClientAsync(SceneClientContext clientContext, Action archiveCurrent)
+    {
+        ArgumentNullException.ThrowIfNull(clientContext);
+        ArgumentNullException.ThrowIfNull(archiveCurrent);
+
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            if (_scene.ClientContext.Profile == clientContext.Profile)
+                return;
+
+            var wasCapturing = IsDriverActive;
+            await StopCoreAsync(drainPending: true);
+            archiveCurrent();
+
+            var scene = new SceneLiveReadModel(RawPacketDump.RotateLogs(clientContext), clientContext);
+            if (_scene.Kind != scene.Kind)
+                scene.ChangeKind(_scene.Kind, scene.SessionStarted, archiveCurrent: false);
+            scene.SetCombatantStatisticsScope(_scene.CombatantStatisticsScope);
+            _scene = scene;
+            _candidateConnections = new(clientContext.Profile);
+            _dispatcher = null;
+
+            if (wasCapturing)
+                await StartCoreAsync();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
     public async Task StopAsync()
     {
-        if (_divert is null)
-            return;
+        await _lifecycleGate.WaitAsync();
+        try
+        {
+            await StopCoreAsync();
+        }
+        finally
+        {
+            _lifecycleGate.Release();
+        }
+    }
+
+    private async Task StopCoreAsync(bool drainPending = false)
+    {
+        var wasCapturing = IsDriverActive;
 
         _cts?.Cancel();
-        _protocolRttEstimator.Clear();
-        _divert.ShutdownReceive();
+        _divert?.ShutdownReceive();
 
         if (_worker is not null)
         {
@@ -626,18 +688,20 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
             }
         }
 
+        // Queued packets still need the old admission and promotion buffers.
+        if (_dispatcher is not null)
+            await _dispatcher.StopAsync(drainPending).ConfigureAwait(false);
+        _protocolRttEstimator.Clear();
         _candidateConnections.DiscardAll();
         _downstreamConnections.Clear();
         _pendingPromotions.CancelAll();
         _acknowledgments.Clear();
-
-        await Dispatcher.StopAsync().ConfigureAwait(false);
         PacketCaptureChannel.Drain();
         CaptureConnectionGate.Unlock();
 
         try
         {
-            _divert.Dispose();
+            _divert?.Dispose();
         }
         catch (Win32Exception)
         {
@@ -645,9 +709,11 @@ public sealed class WinDivertCaptureService(ProcessPortDiscoveryService processP
 
 
         _worker = null;
+        _cts?.Dispose();
         _cts = null;
         _divert = null;
-        PublishStatus("WinDivert capture stopped.");
+        if (wasCapturing)
+            PublishStatus("WinDivert capture stopped.");
     }
 
 

@@ -139,10 +139,12 @@ public class EntityStoreTests
 
 public class DomainEventApplierTests
 {
+    private readonly SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Applier_ApplyJournal_PopulatesEntityStore()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 56688, 0, new StateObservation { EntityId = 56688, StateCode = 2310108 });
@@ -167,7 +169,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_CooldownObservations_DoNotPopulateEntityStore()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         journal.AppendState(
             sceneId,
@@ -192,7 +194,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_EntityVitalObservation_UpdatesNpcHp()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 56688, 0, new StateObservation { EntityId = 56688, StateCode = 2310108 });
@@ -217,7 +219,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_EntityVitalObservation_PreservesLargeNpcHp()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendEntityVital(
@@ -241,7 +243,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_SummonObservation_SetsOwnerAndKind()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendState(
@@ -265,7 +267,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_TransientEffectControl_RemainsUnownedWithoutPacketOwnership()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
         const int ownerId = 7206;
@@ -334,7 +336,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_LifecycleReboundEvents_UseSyntheticEntityId()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         const int reboundId = int.MaxValue - 1;
 
@@ -363,7 +365,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_NpcExtendedStateObservations_PopulateEntityRecord()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 2136, Value0 = 6, Value1 = 200003 });
@@ -395,7 +397,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_SceneObservations_StageAndCommitMapIdentity()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 200003, Kind = SceneObservationKind.CurrentMap });
@@ -414,7 +416,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_SceneObservations_CommitMapStateImmediately()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendScene(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 0, 0, new SceneObservation { MapId = 910035, Kind = SceneObservationKind.CurrentMap });
@@ -432,7 +434,7 @@ public class DomainEventApplierTests
     [Fact]
     public void Applier_EmptyJournal_DoesNothing()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
         var applier = new DomainEventApplier(entities, metadata, new CombatStore());
@@ -446,6 +448,8 @@ public class DomainEventApplierTests
 
 public class CombatStoreTests
 {
+    private readonly SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void CombatStore_ApplyCombat_CreatesPairAndCombatant()
     {
@@ -564,7 +568,7 @@ public class CombatStoreTests
     [Fact]
     public void DomainEventApplier_CombatWireObservation_PopulatesCombatStore()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
         journal.AppendCombat(
@@ -696,6 +700,8 @@ public class SnapshotChangeFeedTests
 
 public class SceneSnapshotAdapterBasicTests
 {
+    private readonly SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Adapter_CreateSnapshot_ProducesCombatantEntries()
     {
@@ -720,7 +726,7 @@ public class SceneSnapshotAdapterBasicTests
             AttemptCount = 1
         }, 1_001);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore(), clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Single(snapshot.Combatants);
@@ -751,7 +757,7 @@ public class SceneSnapshotAdapterBasicTests
             AttemptCount = 1
         }, 1_001);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore(), clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal(501, snapshot.Combatants[100].DamageAmount);
@@ -765,7 +771,7 @@ public class SceneSnapshotAdapterBasicTests
         var mechanics = new MechanicStore();
         var resources = new ResourceStore();
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore());
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore(), clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Empty(snapshot.Combatants);
@@ -782,7 +788,7 @@ public class SceneSnapshotAdapterBasicTests
         metadata.SetCurrentMap(200003);
         metadata.SetMapInstance(515552);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata);
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata, clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal(200003u, snapshot.MapId);
@@ -792,10 +798,12 @@ public class SceneSnapshotAdapterBasicTests
 
 public class SceneCombatSnapshotAdapterTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Adapter_CreateSnapshot_ProjectsSceneTotalsAndWindow()
     {
-        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>
+        _clientContext = CombatResourceTestFixture.CreateContext([], new Dictionary<int, NpcDisplayEntry>
         {
             [9_999_999] = new(9_999_999, "Nazarak", NpcCatalogKind.Boss, NpcHpDisplayScale.Normal)
         });
@@ -829,7 +837,7 @@ public class SceneCombatSnapshotAdapterTests
             Damage = 300
         }, 2_600, CombatPacketRule.PeriodicShieldAbsorbed);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata);
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata, clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         Assert.Equal(200003u, snapshot.MapId);
@@ -849,7 +857,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_ExpandsSinglePointWindowWithRelevantRecovery()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
             new SkillDisplayEntry(13000010, "Recover", SkillCategory.Cleric, SkillSourceType.PcSkill)
@@ -880,7 +888,7 @@ public class SceneCombatSnapshotAdapterTests
             ResourceKind = CombatResourceKind.Health
         }, 2_500);
 
-        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata);
+        var adapter = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, metadata, clientContext: _clientContext);
         var snapshot = adapter.CreateSnapshot();
 
         var player = snapshot.Combatants[100];
@@ -897,7 +905,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_FoldsSummonOutgoingDamageToOwnerAndSkipsSummonTargets()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(16010000, "Cold Shock", SkillCategory.Elementalist, SkillSourceType.PcSkill),
             new SkillDisplayEntry(16100003, "Fire Spirit: Leaping Slam", SkillCategory.Elementalist, SkillSourceType.Unknown),
@@ -927,7 +935,7 @@ public class SceneCombatSnapshotAdapterTests
             AttemptCount = 1
         }, 1_010);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore()).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore(), clientContext: _clientContext).CreateSnapshot();
 
         Assert.True(snapshot.Combatants.TryGetValue(314, out var owner));
         Assert.False(snapshot.Combatants.ContainsKey(900));
@@ -938,7 +946,7 @@ public class SceneCombatSnapshotAdapterTests
     [Fact]
     public void Adapter_CreateSnapshot_HidesKnownNpcClassEvenWithPlayerSkill()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(11000010, "Strike", SkillCategory.Gladiator, SkillSourceType.PcSkill),
             new SkillDisplayEntry(99000010, "Boss Slam", SkillCategory.Npc, SkillSourceType.Unknown)
@@ -966,7 +974,7 @@ public class SceneCombatSnapshotAdapterTests
             AttemptCount = 1
         }, 1_100);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore()).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, new EntityVitalStore(), combat, mechanics, resources, new SceneBoundaryStore(), clientContext: _clientContext).CreateSnapshot();
 
         Assert.Equal(CharacterClass.Gladiator, snapshot.Combatants[100].CharacterClass);
         Assert.Null(snapshot.Combatants[200].CharacterClass);
@@ -986,7 +994,7 @@ public class SceneCombatSnapshotAdapterTests
         entities.ApplyBattleToggle(3518, true);
         bossFocus.ApplyBattle(3518, true, 1_000);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, entityVitals, combat, mechanics, resources, metadata, bossFocus).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, entityVitals, combat, mechanics, resources, metadata, bossFocus, clientContext: _clientContext).CreateSnapshot();
 
         Assert.Equal(3518, snapshot.Encounter.TrackingTargetId);
         Assert.True(snapshot.Encounter.IsActive);
@@ -1016,7 +1024,7 @@ public class SceneCombatSnapshotAdapterTests
             AttemptCount = 1
         }, 20_000);
 
-        var snapshot = new SceneCombatSnapshotAdapter(entities, entityVitals, combat, mechanics, resources, metadata, bossFocus).CreateSnapshot();
+        var snapshot = new SceneCombatSnapshotAdapter(entities, entityVitals, combat, mechanics, resources, metadata, bossFocus, clientContext: _clientContext).CreateSnapshot();
 
         Assert.Equal(200, snapshot.Encounter.TrackingTargetId);
         Assert.NotEqual(3518, snapshot.Encounter.TrackingTargetId);
@@ -1025,10 +1033,12 @@ public class SceneCombatSnapshotAdapterTests
 
 public class SceneReadModelOwnerTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Owner_HasPendingProjectionChanges_TracksJournalAndStoreRevisions()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var owner = new SceneReadModelOwner(journal);
 
         Assert.True(owner.HasPendingProjectionChanges);
@@ -1068,9 +1078,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_ReusesProjectionUntilInputRevisionChanges()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         scene.AppendNickname(100, "Player");
         scene.AppendNpcCode(200, 2_999_999);
         scene.AppendNpcName(2_999_999, "Target");
@@ -1096,9 +1106,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_Uses_Metadata_Class_Over_Skill_Evidence()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         scene.AppendNickname(100, "Player", characterClass: CharacterClass.Cleric);
         scene.AppendNpcCode(200, 2_999_999);
         scene.AppendNpcName(2_999_999, "Target");
@@ -1115,9 +1125,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_Metadata_Class_Overrides_Previous_Skill_Evidence()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         scene.AppendNickname(100, "Player");
         scene.AppendNpcCode(200, 2_999_999);
         scene.AppendNpcName(2_999_999, "Target");
@@ -1136,9 +1146,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_DoesNotInvalidateCacheForNpcNameEventButInvalidatesForEntityAndBossFocusChanges()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         scene.AppendNickname(100, "Player");
         scene.AppendNpcKind(200, NpcKind.Boss);
         scene.AppendNpcCode(200, 2_999_999);
@@ -1169,9 +1179,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_CacheHit_ReturnsFrozenInstance_WithoutAllocation()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         scene.AppendNickname(100, "Player");
         AppendHarnessDamage(scene, 100, 200, 11000010, 500, 1_000);
 
@@ -1201,9 +1211,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSnapshot_ActiveMiss_DoesNotAllocatePerEventPacketDtos()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
@@ -1238,9 +1248,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateSkillBreakdown_UsesCompactProjectionAllocation()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var entities = new EntityStore();
         var metadata = new SceneBoundaryStore();
         var combat = new CombatStore();
@@ -1304,7 +1314,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_Refresh_AppliesJournalIncrementally()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
@@ -1350,7 +1360,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_Refresh_DoesNotFlushPendingCompactAvoidanceBeforeCompletedBatch()
     {
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
         var owner = new SceneReadModelOwner(journal);
 
@@ -1388,9 +1398,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_ReusesWarmSubscriptionForIrrelevantCombat()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
@@ -1419,9 +1429,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UpdatesWarmSubscriptionForRelevantCombat()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
@@ -1450,9 +1460,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_UsesSeparateSubscriptionForSelectionSwitch()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         AppendScenePacket(scene, sink, 100, 200, 11000010, 500, 1_000, 1);
@@ -1474,9 +1484,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void Owner_CreateDetailDelta_TreatsSummonDamageAsOwnerRelevantOnWarmPoll()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var sink = new JournalingRuntimeObservationSink(scene.Journal, scene.Clock, () => scene.SessionId, scene.NextFlushId);
 
         sink.AppendNickname(100, "Owner");
@@ -1504,9 +1514,9 @@ public class SceneReadModelOwnerTests
     [Fact]
     public async Task Owner_CreateFrame_KeepsSnapshotDetailAndArchiveOnOneReadModelRevisionUnderConcurrentAppendAndReset()
     {
-        CombatResourceTestFixture.SetResources(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         sink.AppendNickname(100, "Player");
         using var writerStop = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -1562,7 +1572,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void LiveReadModel_CapturesFactoryJournal()
     {
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         try
         {
             var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -1583,7 +1593,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void LiveReadModel_Reset_BarrierSeparatesOldAndNewCombat()
     {
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         try
         {
             var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -1626,7 +1636,7 @@ public class SceneReadModelOwnerTests
     {
         const int npcId = 29194;
         const int npcCode = 2_980_122;
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         try
         {
             var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -1720,7 +1730,7 @@ public class SceneReadModelOwnerTests
     [Fact]
     public void LiveReadModel_FactoryCreatesSceneSink()
     {
-        var scene = new SceneLiveReadModel();
+        var scene = new SceneLiveReadModel(_clientContext);
         var factory = SceneSinkFactory.CreateForLive(scene);
         try
         {

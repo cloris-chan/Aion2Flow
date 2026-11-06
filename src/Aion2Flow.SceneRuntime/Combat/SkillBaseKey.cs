@@ -4,9 +4,10 @@ public readonly record struct SkillBaseKey(CombatEventKey EventKey) : IComparabl
 {
     public int SkillCode => EventKey.SkillCode;
 
-    public static SkillBaseKey FromEventKey(CombatEventKey eventKey)
+    public static SkillBaseKey FromEventKey(CombatEventKey eventKey, CombatResourceRegistry? resources = null)
     {
-        if (!CombatResourceRegistry.TryResolveBaseSkillIdForEventKey(eventKey, out var baseSkillId))
+        resources ??= SceneClientContext.Purple.CombatResources;
+        if (!resources.TryResolveBaseSkillIdForEventKey(eventKey, out var baseSkillId))
             return new SkillBaseKey(eventKey);
 
         if (baseSkillId <= 0 ||

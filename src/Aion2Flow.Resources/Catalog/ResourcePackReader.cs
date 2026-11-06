@@ -23,9 +23,18 @@ internal static partial class ResourcePackReader
         ServerNames = 104
     }
 
-    public static ResourceSharedCatalog LoadShared()
+    public static ResourceSharedCatalog LoadShared(ResourceSetDescriptor resourceSet)
     {
-        var payload = LoadPackPayload(ResourcePackManifest.SharedResourceName, ResourcePackDecoder.SharedPackKind, ResourcePackManifest.SharedUncompressedLength, ResourcePackManifest.SharedChecksum);
+        var entry = resourceSet.SharedPack;
+        var payload = LoadPackPayload(entry.ResourceName, ResourcePackDecoder.SharedPackKind, entry.UncompressedLength, entry.Checksum);
+        return ReadSharedCatalog(payload);
+    }
+
+    internal static ResourceSharedCatalog ReadSharedPack(Stream stream, ResourcePackEntry entry)
+        => ReadSharedCatalog(ReadPackPayload(stream, entry.ResourceName, ResourcePackDecoder.SharedPackKind, entry.UncompressedLength, entry.Checksum));
+
+    private static ResourceSharedCatalog ReadSharedCatalog(byte[] payload)
+    {
         var sections = ReadSections(payload);
 
         return new ResourceSharedCatalog(
@@ -36,25 +45,38 @@ internal static partial class ResourcePackReader
             ReadNpcDefinitions(RequireSection(sections, SectionId.NpcDefinitions)));
     }
 
-    public static ResourceLocaleCatalog LoadLocale(string language)
+    public static ResourceLocaleCatalog LoadLocale(ResourceSetDescriptor resourceSet, string language)
     {
-        var entry = ResourcePackManifest.GetLocale(language);
+        var entry = resourceSet.GetLocale(language);
         var payload = LoadPackPayload(entry.ResourceName, ResourcePackDecoder.LocalePackKind, entry.UncompressedLength, entry.Checksum);
+        return ReadLocaleCatalog(payload, language, resourceSet.StringMask);
+    }
+
+    internal static ResourceLocaleCatalog ReadLocalePack(Stream stream, ResourceLocalePackEntry entry, byte stringMask)
+        => ReadLocaleCatalog(ReadPackPayload(stream, entry.ResourceName, ResourcePackDecoder.LocalePackKind, entry.UncompressedLength, entry.Checksum), entry.Language, stringMask);
+
+    private static ResourceLocaleCatalog ReadLocaleCatalog(byte[] payload, string language, byte stringMask)
+    {
         var sections = ReadSections(payload);
 
         return new ResourceLocaleCatalog(
             language,
-            ReadIntStringMap(RequireSection(sections, SectionId.SkillNames)),
-            ReadIntStringMap(RequireSection(sections, SectionId.NpcCatalogNames)),
-            ReadUIntStringMap(RequireSection(sections, SectionId.MapNames)),
-            ReadServerNames(RequireSection(sections, SectionId.ServerNames)));
+            ReadIntStringMap(RequireSection(sections, SectionId.SkillNames), stringMask),
+            ReadIntStringMap(RequireSection(sections, SectionId.NpcCatalogNames), stringMask),
+            ReadUIntStringMap(RequireSection(sections, SectionId.MapNames), stringMask),
+            ReadServerNames(RequireSection(sections, SectionId.ServerNames), stringMask));
     }
 
     private static byte[] LoadPackPayload(string resourceName, byte expectedKind, int expectedUncompressedLength, ulong expectedChecksum)
     {
         using var stream = typeof(ResourceCatalog).Assembly.GetManifestResourceStream(resourceName)
             ?? throw new InvalidDataException($"Missing embedded resource pack: {resourceName}");
-        using var reader = new BinaryReader(stream);
+        return ReadPackPayload(stream, resourceName, expectedKind, expectedUncompressedLength, expectedChecksum);
+    }
+
+    private static byte[] ReadPackPayload(Stream stream, string resourceName, byte expectedKind, int expectedUncompressedLength, ulong expectedChecksum)
+    {
+        using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
         var magic = reader.ReadUInt32();
         var version = reader.ReadUInt16();
         var kind = reader.ReadByte();
@@ -68,9 +90,9 @@ internal static partial class ResourcePackReader
         }
 
         var compressed = reader.ReadBytes(compressedLength);
-        if (compressed.Length != compressedLength)
+        if (compressed.Length != compressedLength || stream.ReadByte() != -1)
         {
-            throw new InvalidDataException($"Truncated resource pack: {resourceName}");
+            throw new InvalidDataException($"Truncated or trailing resource pack bytes: {resourceName}");
         }
 
         var payload = new byte[uncompressedLength];
@@ -197,42 +219,42 @@ internal static partial class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static FrozenDictionary<int, string> ReadIntStringMap(ResourcePackSection section)
+    private static FrozenDictionary<int, string> ReadIntStringMap(ResourcePackSection section, byte stringMask)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
         var result = new Dictionary<int, string>(count);
         for (var i = 0; i < count; i++)
         {
-            result.Add(ReadInt32(ref cursor), ReadString(ref cursor));
+            result.Add(ReadInt32(ref cursor), ReadString(ref cursor, stringMask));
         }
 
         RequireFullyRead(cursor);
         return result.ToFrozenDictionary();
     }
 
-    private static FrozenDictionary<uint, string> ReadUIntStringMap(ResourcePackSection section)
+    private static FrozenDictionary<uint, string> ReadUIntStringMap(ResourcePackSection section, byte stringMask)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
         var result = new Dictionary<uint, string>(count);
         for (var i = 0; i < count; i++)
         {
-            result.Add(ReadUInt32(ref cursor), ReadString(ref cursor));
+            result.Add(ReadUInt32(ref cursor), ReadString(ref cursor, stringMask));
         }
 
         RequireFullyRead(cursor);
         return result.ToFrozenDictionary();
     }
 
-    private static FrozenDictionary<int, ServerNameEntry> ReadServerNames(ResourcePackSection section)
+    private static FrozenDictionary<int, ServerNameEntry> ReadServerNames(ResourcePackSection section, byte stringMask)
     {
         var cursor = section.Payload.Span;
         var count = section.Count;
         var result = new Dictionary<int, ServerNameEntry>(count);
         for (var i = 0; i < count; i++)
         {
-            var entry = new ServerNameEntry(ReadInt32(ref cursor), ReadString(ref cursor), ReadString(ref cursor));
+            var entry = new ServerNameEntry(ReadInt32(ref cursor), ReadString(ref cursor, stringMask), ReadString(ref cursor, stringMask));
             result.Add(entry.Code, entry);
         }
 
@@ -240,7 +262,7 @@ internal static partial class ResourcePackReader
         return result.ToFrozenDictionary();
     }
 
-    private static string ReadString(ref ReadOnlySpan<byte> cursor)
+    private static string ReadString(ref ReadOnlySpan<byte> cursor, byte stringMask)
     {
         var length = ReadInt32(ref cursor);
         if (length < 0)
@@ -248,10 +270,10 @@ internal static partial class ResourcePackReader
             throw new InvalidDataException("Unexpected null string in resource pack.");
         }
 
-        return ReadStringBody(ref cursor, length);
+        return ReadStringBody(ref cursor, length, stringMask);
     }
 
-    private static string ReadStringBody(ref ReadOnlySpan<byte> cursor, int length)
+    private static string ReadStringBody(ref ReadOnlySpan<byte> cursor, int length, byte stringMask)
     {
         if (length == 0)
         {
@@ -267,7 +289,7 @@ internal static partial class ResourcePackReader
         cursor = cursor[length..];
         for (var i = 0; i < bytes.Length; i++)
         {
-            bytes[i] ^= ResourcePackDecoder.StringMask;
+            bytes[i] ^= stringMask;
         }
 
         return System.Text.Encoding.UTF8.GetString(bytes);

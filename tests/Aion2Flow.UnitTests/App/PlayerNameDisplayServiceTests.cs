@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
@@ -52,7 +53,7 @@ public sealed class PlayerNameDisplayServiceTests
         var language = new LanguageService();
         language.SetLanguage(LanguageService.TraditionalChinese);
         using var localization = new LocalizationService(language);
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
         var settings = CreateSettings();
         using var display = new PlayerNameDisplayService(settings, localization)
@@ -73,7 +74,7 @@ public sealed class PlayerNameDisplayServiceTests
         var language = new LanguageService();
         language.SetLanguage(LanguageService.TraditionalChinese);
         using var localization = new LocalizationService(language);
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
         var settings = CreateSettings();
         using var display = new PlayerNameDisplayService(settings, localization)
@@ -95,7 +96,7 @@ public sealed class PlayerNameDisplayServiceTests
         builder.AddPcMetadata(new PcMetadata(100, "B", CharacterClass: CharacterClass.Elementalist));
         builder.AddPcMetadata(new PcMetadata(200, "C", CharacterClass: CharacterClass.Cleric));
         var language = new LanguageService();
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
 
         Assert.Equal(1, context.ResolvePcAnonymousOrdinal(100));
@@ -120,7 +121,7 @@ public sealed class PlayerNameDisplayServiceTests
                 SceneSnapshotTestFactory.Combatant(400, SceneSnapshotTestFactory.VisibleMetrics(CharacterClass.Elementalist))
             ]);
         var language = new LanguageService();
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), registry, snapshot, resources, "Unknown");
 
         Assert.Equal(1, context.ResolvePcAnonymousOrdinal(50));
@@ -138,7 +139,7 @@ public sealed class PlayerNameDisplayServiceTests
         var builder = new SceneIdentityScopeBuilder();
         builder.AddPcMetadata(new PcMetadata(100, "Perigee", CharacterClass: CharacterClass.Elementalist, IsLocalPlayer: true));
         var language = new LanguageService();
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), null, null, resources, "Unknown");
 
         Assert.True(context.IsLocalPlayer(100));
@@ -154,7 +155,7 @@ public sealed class PlayerNameDisplayServiceTests
         registry.UpsertPcMetadata(100, "Perigee", originServerId: 1001, legionName: "Aether");
         var language = new LanguageService();
         language.SetLanguage(LanguageService.TraditionalChinese);
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(builder.ToScope(), registry, null, resources, "Unknown");
         using var localization = new LocalizationService(language);
         var settings = CreateSettings();
@@ -175,7 +176,7 @@ public sealed class PlayerNameDisplayServiceTests
     {
         var language = new LanguageService();
         language.SetLanguage(LanguageService.TraditionalChinese);
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
         var context = new SceneDisplayContext(SceneIdentityScope.Empty, null, null, resources, "Unknown");
 
         Assert.Equal("希埃", context.ResolveShortServerName(1001));

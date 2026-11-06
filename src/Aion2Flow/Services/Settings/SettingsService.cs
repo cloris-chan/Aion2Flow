@@ -111,6 +111,8 @@ public sealed class SettingsService
         SkillMonitorWidth = source.SkillMonitorWidth,
         UiScalePercent = source.UiScalePercent,
         Language = source.Language,
+        ClientVersion = source.ClientVersion,
+        ResourceLanguage = source.ResourceLanguage,
         BattleResetHotkeyModifiers = source.BattleResetHotkeyModifiers,
         BattleResetHotkeyVirtualKey = source.BattleResetHotkeyVirtualKey,
         OverlayInteractionHotkeyModifiers = source.OverlayInteractionHotkeyModifiers,

@@ -43,4 +43,15 @@ public static class ReplayScenarioCatalog
     public const string CurrentChargeCooldown = "aion2flow.stream.20260809050345.log";
     public const string CurrentRoundTripShortUptime = "aion2flow.stream.20261007155148.log";
     public const string CurrentRoundTripLongUptime = "aion2flow.stream.20261017050224.log";
+    public const string SteamSummonOwnership = "aion2flow.stream.20261031060531.log";
+    public static readonly string[] SteamContinuousSession =
+    [
+        "aion2flow.stream.20261106030558.log", "aion2flow.stream.20261106030640.log",
+        "aion2flow.stream.20261106031049.log", "aion2flow.stream.20261106031238.log",
+        "aion2flow.stream.20261106031351.log", "aion2flow.stream.20261106031402.log",
+        "aion2flow.stream.20261106031815.log", "aion2flow.stream.20261106031937.log",
+        "aion2flow.stream.20261106032017.log", "aion2flow.stream.20261106032038.log",
+        "aion2flow.stream.20261106032326.log", "aion2flow.stream.20261106032510.log",
+        "aion2flow.stream.20261106032740.log"
+    ];
 }

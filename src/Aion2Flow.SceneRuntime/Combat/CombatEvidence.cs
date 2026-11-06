@@ -250,19 +250,20 @@ public static class CombatSemanticEvidenceResolver
         SkillQuantifiedFacet.PeriodicHealing |
         SkillQuantifiedFacet.Shield;
 
-    public static CombatSemanticEvidence Evaluate(in CombatWireObservation observation)
+    public static CombatSemanticEvidence Evaluate(in CombatWireObservation observation, CombatResourceRegistry? resources = null)
     {
+        resources ??= SceneClientContext.Purple.CombatResources;
         if (observation.ResourceKind != CombatResourceKind.Unknown)
             return default;
 
         if (observation.PeriodicRelation != PeriodicEffectRelation.None)
         {
             return observation.PeriodicMode == 9
-                ? EvaluatePeriodicPoolGrant(in observation)
-                : EvaluatePeriodic(in observation);
+                ? EvaluatePeriodicPoolGrant(in observation, resources)
+                : EvaluatePeriodic(in observation, resources);
         }
 
-        if (!CombatResourceRegistry.TryResolveDirectCombatResourceSemantics(in observation, out var resolution))
+        if (!resources.TryResolveDirectCombatResourceSemantics(in observation, out var resolution))
             return default;
 
         var match = GetSemanticMatch(in resolution);
@@ -270,12 +271,12 @@ public static class CombatSemanticEvidenceResolver
         return new CombatSemanticEvidence(match, resolution, TryCreateCandidate(facets, periodic: false, observation.Damage));
     }
 
-    private static CombatSemanticEvidence EvaluatePeriodicPoolGrant(in CombatWireObservation observation)
+    private static CombatSemanticEvidence EvaluatePeriodicPoolGrant(in CombatWireObservation observation, CombatResourceRegistry resources)
     {
         if (observation.PeriodicMode != 9 ||
             observation.PeriodicRelation == PeriodicEffectRelation.None ||
             observation.ResourceKind != CombatResourceKind.Unknown ||
-            !CombatResourceRegistry.TryResolvePeriodicCombatResourceSemantics(in observation, out var resolution))
+            !resources.TryResolvePeriodicCombatResourceSemantics(in observation, out var resolution))
         {
             return default;
         }
@@ -288,12 +289,12 @@ public static class CombatSemanticEvidenceResolver
         return new CombatSemanticEvidence(match, resolution, candidate);
     }
 
-    private static CombatSemanticEvidence EvaluatePeriodic(in CombatWireObservation observation)
+    private static CombatSemanticEvidence EvaluatePeriodic(in CombatWireObservation observation, CombatResourceRegistry resources)
     {
         if (CombatWireTraits.IsPeriodicTargetInitialEffect(in observation) ||
             CombatWireTraits.IsPeriodicSelfMode(in observation, 10) ||
             CombatWireTraits.IsPeriodicTargetStateSeed(in observation) ||
-            !CombatResourceRegistry.TryResolvePeriodicCombatResourceSemantics(in observation, out var resolution))
+            !resources.TryResolvePeriodicCombatResourceSemantics(in observation, out var resolution))
         {
             return default;
         }

@@ -1,0 +1,29 @@
+{
+  "ResourceSetId": "purple",
+  "Rows": 747,
+  "MapKeyRows": 372,
+  "SubzoneKeyRows": 73,
+  "Locales": [
+    {
+      "Language": "en-US",
+      "VerifiedNames": 214,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "ko-KR",
+      "VerifiedNames": 214,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    },
+    {
+      "Language": "zh-TW",
+      "VerifiedNames": 214,
+      "PriorSourceOverrides": 2,
+      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutLocalizedAlias": []
+    }
+  ]
+}

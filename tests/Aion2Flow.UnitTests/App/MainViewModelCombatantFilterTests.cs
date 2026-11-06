@@ -1,5 +1,6 @@
 using Avalonia.Media;
 using Cloris.Aion2Flow.Capture;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
@@ -18,6 +19,106 @@ namespace Cloris.Aion2Flow.Tests.App;
 
 public sealed class MainViewModelCombatantFilterTests
 {
+    [Fact]
+    public void ClientSelectionArchivesOnceAndPreservesHistoricalPlaybackAcrossBothClients()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(100, "Purple player", 1000, 1000, 2000);
+        var originalContext = fixture.Capture.Scene.ClientContext;
+        var originalJournal = fixture.Capture.Scene.Journal;
+        var originalDispatcher = fixture.Capture.Dispatcher;
+        var livePlayback = fixture.ViewModel.CreateLivePlaybackContext();
+        using var playbackSource = livePlayback.Source;
+
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+
+        var purpleArchive = Assert.Single(fixture.Archive.History);
+        Assert.Equal("client-change", purpleArchive.Trigger);
+        Assert.True(purpleArchive.IsAutomatic);
+        Assert.Same(originalContext, purpleArchive.ScenePayload.ClientContext);
+        Assert.Same(originalContext, playbackSource.ClientContext);
+        Assert.False(playbackSource.CreateTimelineSegment().IsLiveGrowing);
+        Assert.Equal(1000, playbackSource.CreateSnapshot().Combatants[100].DamageAmount);
+        Assert.Equal(ClientProfiles.Steam, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.Equal(ClientProfiles.Steam, fixture.ViewModel.DisplayContext!.Resources.Profile);
+        Assert.NotSame(originalJournal, fixture.Capture.Scene.Journal);
+        Assert.NotSame(originalDispatcher, fixture.Capture.Dispatcher);
+        Assert.Empty(fixture.CreateSceneSnapshot().Combatants);
+
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+        Assert.Single(fixture.Archive.History);
+
+        fixture.AppendSceneEncounter(100, "Steam player", 500, 1000, 2000);
+        fixture.Settings.SelectedClientVersion = ClientVersion.Purple;
+
+        Assert.Equal(2, fixture.Archive.History.Count);
+        var steamArchive = fixture.Archive.History[0];
+        Assert.Equal(ClientProfiles.Steam, steamArchive.ScenePayload.ClientContext.Profile);
+        Assert.Equal(500, steamArchive.ScenePayload.Snapshot.Combatants[100].DamageAmount);
+        Assert.Same(purpleArchive, fixture.Archive.History[1]);
+        Assert.Equal(ClientProfiles.Purple, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.Empty(fixture.CreateSceneSnapshot().Combatants);
+        using var source = new ArchivedScenePlaybackSource(steamArchive.ScenePayload);
+        var playback = new ScenePlaybackSession(source);
+        Assert.Equal(500, playback.Seek(long.MaxValue, TestContext.Current.CancellationToken).Snapshot.Combatants[100].DamageAmount);
+    }
+
+    [Theory]
+    [InlineData(SceneKind.Standard)]
+    [InlineData(SceneKind.Boss)]
+    public void ClientSelectionKeepsCollectionSettingsAndDoesNotArchiveEmptyScenes(SceneKind kind)
+    {
+        var fixture = MainViewModelFixture.Create(kind);
+        var scope = Enum.GetValues<CombatantStatisticsScope>().First(value => value != CombatantStatisticsScope.All);
+        fixture.Settings.CombatantStatisticsScope = scope;
+
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+
+        Assert.Equal(ClientProfiles.Steam, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.Equal(kind, fixture.Capture.Scene.Kind);
+        Assert.Equal(scope, fixture.Capture.Scene.CombatantStatisticsScope);
+        Assert.Empty(fixture.Archive.History);
+    }
+
+    [Fact]
+    public void ClientSelectionChangedDuringArchivingAppliesLatestSelection()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(100, "Purple player", 1000, 1000, 2000);
+        var originalSceneId = fixture.SceneId;
+        fixture.Archive.HistoryChanged += (_, _) => fixture.Settings.SelectedClientVersion = ClientVersion.Purple;
+
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+
+        Assert.Equal(ClientVersion.Purple, fixture.Settings.SelectedClientVersion);
+        Assert.Equal(ClientProfiles.Purple, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.NotEqual(originalSceneId, fixture.SceneId);
+        Assert.Single(fixture.Archive.History);
+        Assert.Empty(fixture.CreateSceneSnapshot().Combatants);
+    }
+
+    [Fact]
+    public void FailedClientSwitchKeepsSelectionAtActiveContextAndAllowsRetry()
+    {
+        var fixture = MainViewModelFixture.Create();
+        fixture.AppendSceneEncounter(100, "Purple player", 1000, 1000, 2000);
+        EventHandler failArchive = (_, _) => throw new InvalidOperationException("Archive failed.");
+        fixture.Archive.HistoryChanged += failArchive;
+
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+
+        Assert.Equal(ClientVersion.Purple, fixture.Settings.SelectedClientVersion);
+        Assert.Equal(ClientProfiles.Purple, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.Equal("Archive failed.", fixture.ViewModel.Status);
+        Assert.Single(fixture.Archive.History);
+
+        fixture.Archive.HistoryChanged -= failArchive;
+        fixture.Settings.SelectedClientVersion = ClientVersion.Steam;
+
+        Assert.Equal(ClientProfiles.Steam, fixture.Capture.Scene.ClientContext.Profile);
+        Assert.Single(fixture.Archive.History);
+    }
+
     [Fact]
     public void EncounterTimeDisplayFormat_PropagatesToCombatantDetails()
     {
@@ -1240,6 +1341,7 @@ public sealed class MainViewModelCombatantFilterTests
         }
 
         public MainViewModel ViewModel { get; }
+        public WinDivertCaptureService Capture => _captureService;
         public SettingsFlyoutViewModel Settings => ViewModel.SettingsFlyout;
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
@@ -1250,23 +1352,23 @@ public sealed class MainViewModelCombatantFilterTests
 
         public static MainViewModelFixture Create(SceneKind sceneKind = SceneKind.Standard)
         {
-            CombatResourceTestFixture.SetResources(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
+            var clientContext = CombatResourceTestFixture.CreateContext(BuildSkillMap(), ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog);
             var settingsPath = Path.Combine(Path.GetTempPath(), $"aion2flow-test-{Guid.NewGuid():N}.json");
             var settings = new SettingsService(settingsPath);
             settings.Update(s => s.SceneKind = sceneKind);
             var language = new LanguageService();
             language.SetLanguage(LanguageService.TraditionalChinese);
             var localization = new LocalizationService(language);
-            var resources = new GameResourceService(language);
+            var resources = new GameResourceService(clientContext, clientContext.Resources.Language);
             var archive = new EncounterArchiveService();
             var ports = new ProcessPortDiscoveryService();
-            var capture = new WinDivertCaptureService(ports);
+            var capture = new WinDivertCaptureService(ports, clientContext: clientContext);
             capture.Scene.Reset(DateTimeOffset.Now);
             var frameBatch = new UiFrameBatchService();
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
             var playerNameDisplay = new PlayerNameDisplayService(settings, localization);
             var uiScale = new UiScaleService(settings);
-            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, uiScale, new AppUpdateService(), new ProcessForegroundWatcher(), new GlobalHotkeyService());
+            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, uiScale, new AppUpdateService(), new ProcessForegroundWatcher(), new GlobalHotkeyService(), new ClientSettingsService(settings, language));
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }

@@ -16,11 +16,14 @@ public static class SceneSinkFactory
     public static Func<IRuntimeObservationSink> CreateForLive(SceneLiveReadModel scene) =>
         scene.CreateSink;
 
-    public static ReplaySinkHolder CreateForReplay()
+    public static ReplaySinkHolder CreateForReplay(SceneClientContext? clientContext = null)
     {
         var scene = new SceneLiveReadModel(
             DateTimeOffset.UnixEpoch,
-            ReplaySinkTimeProvider.Instance);
+            ReplaySinkTimeProvider.Instance,
+            null,
+            null,
+            clientContext);
         return new ReplaySinkHolder(scene.CreateSink(), scene);
     }
 
@@ -59,6 +62,7 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     private int _playbackSourceCount;
 
     public Guid SessionId { get; private set; }
+    public SceneClientContext ClientContext { get; }
     public DateTimeOffset SessionStarted { get; private set; }
     public ObservedEventJournal Journal { get; }
     public SceneRuntimeClock Clock { get; }
@@ -119,6 +123,14 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
     {
     }
 
+    public SceneLiveReadModel(SceneClientContext clientContext) : this(DateTimeOffset.Now, TimeProvider.System, null, null, clientContext)
+    {
+    }
+
+    public SceneLiveReadModel(DateTimeOffset sessionStarted, SceneClientContext clientContext) : this(sessionStarted, TimeProvider.System, null, null, clientContext)
+    {
+    }
+
     public SceneLiveReadModel(DateTimeOffset sessionStarted, TimeProvider timeProvider)
         : this(sessionStarted, timeProvider, null, null)
     {
@@ -128,15 +140,17 @@ public sealed class SceneLiveReadModel : ILiveSceneCollectionPolicy
         DateTimeOffset sessionStarted,
         TimeProvider timeProvider,
         ICombatOccurrenceObserver? combatOccurrenceObserver,
-        IAuraLifecycleObserver? auraLifecycleObserver)
+        IAuraLifecycleObserver? auraLifecycleObserver,
+        SceneClientContext? clientContext = null)
     {
+        ClientContext = clientContext ?? SceneClientContext.Purple;
         _timeProvider = timeProvider;
         _combatOccurrenceObserver = combatOccurrenceObserver;
         _auraLifecycleObserver = auraLifecycleObserver;
         SessionId = Guid.NewGuid();
         SessionStarted = sessionStarted;
         Clock = new SceneRuntimeClock(sessionStarted.ToUnixTimeMilliseconds());
-        Journal = new ObservedEventJournal(LiveJournalInitialCapacity);
+        Journal = new ObservedEventJournal(LiveJournalInitialCapacity, ClientContext);
         _owner = CreateOwner(SessionId, sessionStarted, Journal.FirstObservationOrdinal);
         _kind = SceneKind.Standard;
         _bossState = BossSceneState.Waiting;

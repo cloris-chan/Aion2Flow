@@ -78,10 +78,11 @@ public sealed class EntityStore
     public bool ApplyCharacterClassEvidence(
         int entityId,
         in CombatWireObservation observation,
-        in CombatContribution contribution)
+        in CombatContribution contribution,
+        CombatResourceRegistry? resources = null)
     {
         if (entityId <= 0 ||
-            !CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score))
+            !CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score, resources))
         {
             return false;
         }

@@ -151,7 +151,7 @@ internal static class SkillDetailRowBuilder
 
     internal static DetailSkillBaseProjection ResolveSkillBaseProjection(CombatEventKey eventKey, SceneDisplayContext? displayContext, LocalizationService localization)
     {
-        var key = SkillBaseKey.FromEventKey(eventKey);
+        var key = SkillBaseKey.FromEventKey(eventKey, displayContext?.Resources.CombatResources);
         var skillCode = key.SkillCode == eventKey.SkillCode || displayContext?.ContainsSkill(key.SkillCode) == true
             ? key.SkillCode
             : eventKey.SkillCode;

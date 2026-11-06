@@ -5,10 +5,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class CombatContributionResolverTests
 {
-    public CombatContributionResolverTests()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-    }
 
     [Fact]
     public void Proven_CompactRecovery_Is_Authoritative_Over_Resource_Semantics()

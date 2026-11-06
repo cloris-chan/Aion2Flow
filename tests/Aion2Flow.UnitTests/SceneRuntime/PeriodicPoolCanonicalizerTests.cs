@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.Clients;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -9,13 +11,15 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 public class PeriodicPoolCanonicalizerTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void ScenePath_NormalizesSelfPeriodicHealingRemainingTotal()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 2508;
         const int chainId = 4242;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -40,10 +44,10 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_SelfPeriodicHealingTerminalTickUsesTailValue()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 2508;
         const int chainId = 4242;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -69,7 +73,7 @@ public class PeriodicPoolCanonicalizerTests
         const int casterId = 100;
         const int targetId = 200;
         const int chainId = 9001;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -110,7 +114,7 @@ public class PeriodicPoolCanonicalizerTests
         const int casterId = 100;
         const int targetId = 200;
         const int chainId = 9002;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -144,7 +148,7 @@ public class PeriodicPoolCanonicalizerTests
         const int targetId = 200;
         const int attackerId = 300;
         const int chainId = 9003;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -178,7 +182,7 @@ public class PeriodicPoolCanonicalizerTests
     {
         const int playerId = 8470;
         const int chainId = 77;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -199,7 +203,7 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_PeriodicPoolKeyUsesTailEffectToAvoidSameChainCollision()
     {
-        CombatResourceTestFixture.SetResources([], new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext([], new Dictionary<int, NpcDisplayEntry>());
 
         const int casterA = 100;
         const int casterB = 101;
@@ -208,7 +212,7 @@ public class PeriodicPoolCanonicalizerTests
         const int chainId = 77;
         const int tailA = 500011;
         const int tailB = 500022;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -229,7 +233,7 @@ public class PeriodicPoolCanonicalizerTests
     {
         const int playerId = 8470;
         const int chainId = 69;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -246,9 +250,9 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_SemanticMode9ShieldGrantEmitsWithoutAbsorb()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 15104;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var grant = CreatePeriodicObservation(
@@ -282,11 +286,11 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_SemanticMode9ShieldGrantIsNotDuplicatedByLaterAbsorb()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 15104;
         const int attackerId = 136787;
         const int chainId = 79;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var grant = CreatePeriodicObservation(
@@ -326,11 +330,11 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void ScenePath_PacketAndSemanticPathsRemainIndependentAcrossSemanticGrantAndAbsorb()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 15104;
         const int attackerId = 136787;
         const int chainId = 79;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var observer = new RecordingCombatOccurrenceObserver();
@@ -356,7 +360,7 @@ public class PeriodicPoolCanonicalizerTests
             tailLength: 5);
         AppendCombatWireObservation(sink, attackerId, playerId, in continuation, 2_000);
         var combat = new CombatStore();
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer, journal.ClientContext);
 
         applier.ApplyJournal(journal);
 
@@ -391,7 +395,7 @@ public class PeriodicPoolCanonicalizerTests
         const int playerId = 8470;
         const int attackerId = 136787;
         const int chainId = 70;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -425,7 +429,7 @@ public class PeriodicPoolCanonicalizerTests
         const int playerId = 8470;
         const int attackerId = 136787;
         const int chainId = 59;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -437,7 +441,7 @@ public class PeriodicPoolCanonicalizerTests
 
         var combat = new CombatStore();
         var observer = new RecordingCombatOccurrenceObserver();
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, observer, journal.ClientContext);
         applier.ApplyJournal(journal);
 
         Assert.False(combat.TryGetCombatant(playerId, out var player));
@@ -512,7 +516,7 @@ public class PeriodicPoolCanonicalizerTests
     {
         const int sourceId = 100;
         const int targetId = 200;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var packet = CreatePeriodicObservation(
@@ -547,7 +551,7 @@ public class PeriodicPoolCanonicalizerTests
     public void ScenePath_StandaloneMode10SelfPacketDoesNotBecomeDamage()
     {
         const int sourceId = 100;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var packet = CreatePeriodicObservation(
@@ -572,7 +576,7 @@ public class PeriodicPoolCanonicalizerTests
     {
         const int sourceId = 100;
         const int targetId = 200;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
         var packet = CreatePeriodicObservation(
@@ -595,7 +599,7 @@ public class PeriodicPoolCanonicalizerTests
     {
         const int sourceId = 100;
         const int targetId = 200;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -614,9 +618,9 @@ public class PeriodicPoolCanonicalizerTests
     [Fact]
     public void JournalingSink_PreservesRawPeriodicPacketObservation()
     {
-        CombatResourceRegistry.LoadSkillMap("zh-TW");
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("zh-TW"));
         const int playerId = 2508;
-        var journal = new ObservedEventJournal();
+        var journal = new ObservedEventJournal(clientContext: _clientContext);
         var clock = new SceneRuntimeClock(0);
         var sink = new JournalingRuntimeObservationSink(journal, clock, Guid.NewGuid());
 
@@ -635,7 +639,7 @@ public class PeriodicPoolCanonicalizerTests
     private static CombatStore Apply(ObservedEventJournal journal, out MechanicStore mechanics, out ResourceStore resources)
     {
         var combat = new CombatStore();
-        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat);
+        var applier = new DomainEventApplier(new EntityStore(), new SceneBoundaryStore(), combat, clientContext: journal.ClientContext);
         applier.ApplyJournal(journal);
         mechanics = applier.Mechanics;
         resources = applier.Resources;

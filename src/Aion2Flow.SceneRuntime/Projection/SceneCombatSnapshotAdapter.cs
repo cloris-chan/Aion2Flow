@@ -5,8 +5,9 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Projection;
 
-public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneBoundaryStore boundary, BossFocusStore? bossFocus = null, Guid encounterId = default)
+public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVitalStore entityVitals, CombatStore combat, MechanicStore mechanics, ResourceStore resources, SceneBoundaryStore boundary, BossFocusStore? bossFocus = null, Guid encounterId = default, SceneClientContext? clientContext = null)
 {
+    public SceneClientContext ClientContext { get; } = clientContext ?? SceneClientContext.Purple;
     private const int SmallSetStackCapacity = 64;
 
     private readonly Dictionary<int, CombatantClassEvidence> _classEvidence = [];
@@ -15,7 +16,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
     private readonly Dictionary<int, TargetInfo> _targetInfos = [];
     private long _classEvidenceCombatRevision = -1;
     private long _classEvidenceIdentityRevision = -1;
-    private long _classEvidenceSkillMapRevision = -1;
     private int _classEvidenceScannedEventCount;
     private long _resolveCacheIdentityRevision = -1;
     private bool _hasProjectionBaseline;
@@ -40,8 +40,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
         return new SceneCombatSnapshotAdapterSnapshot(
             CreateClassEvidenceSnapshot(),
             _classEvidenceCombatRevision,
-            _classEvidenceIdentityRevision,
-            _classEvidenceSkillMapRevision);
+            _classEvidenceIdentityRevision);
     }
 
     public SceneCombatSnapshot CreateSnapshot(SceneKind kind = SceneKind.Standard)
@@ -49,7 +48,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
         var builder = new SceneCombatSnapshotBuilder();
         builder.Reset(encounterId, kind, combat.Combatants.Count + mechanics.Combatants.Count + (resources.Pairs.Count * 2), 0);
         BuildSnapshot(builder);
-        return builder.ToSnapshot(ReadModelRevision);
+        return builder.ToSnapshot(ReadModelRevision, ClientContext);
     }
 
     internal void BuildSnapshot(SceneCombatSnapshotBuilder builder)
@@ -497,7 +496,7 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
             var observation = record.Observation;
             var contribution = record.Contribution;
-            if (!CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score))
+            if (!CombatantClassEvidence.TryCreate(in observation, in contribution, out var characterClass, out var score, ClientContext.CombatResources))
                 continue;
 
             ref var evidence = ref CollectionsMarshal.GetValueRefOrAddDefault(_classEvidence, sourceId, out _);
@@ -807,7 +806,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
         _classEvidenceCombatRevision = snapshot.ClassEvidenceCombatRevision;
         _classEvidenceIdentityRevision = snapshot.ClassEvidenceIdentityRevision;
-        _classEvidenceSkillMapRevision = snapshot.ClassEvidenceSkillMapRevision;
         _classEvidenceScannedEventCount = 0;
         _hasProjectionBaseline = true;
     }
@@ -821,12 +819,10 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
     {
         var combatRevision = combat.Revision;
         var identityRevision = entities.IdentityRevision;
-        var skillMapRevision = CombatResourceRegistry.SkillMapRevision;
         var events = combat.EventSpan;
         var rebuildFromStart = combatRevision < _classEvidenceCombatRevision ||
                                (!_hasProjectionBaseline &&
                                 (_classEvidenceIdentityRevision != identityRevision ||
-                                  _classEvidenceSkillMapRevision != skillMapRevision ||
                                  _classEvidenceScannedEventCount > events.Length));
 
         if (rebuildFromStart)
@@ -843,7 +839,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
         _classEvidenceCombatRevision = combatRevision;
         _classEvidenceIdentityRevision = identityRevision;
-        _classEvidenceSkillMapRevision = skillMapRevision;
     }
 
     private void EnsureResolveCaches()
@@ -1061,7 +1056,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 internal sealed record SceneCombatSnapshotAdapterSnapshot(
     SceneCombatSnapshotClassEvidenceEntry[] ClassEvidence,
     long ClassEvidenceCombatRevision,
-    long ClassEvidenceIdentityRevision,
-    long ClassEvidenceSkillMapRevision);
+    long ClassEvidenceIdentityRevision);
 
 internal readonly record struct SceneCombatSnapshotClassEvidenceEntry(int EntityId, CombatantClassEvidence Evidence);

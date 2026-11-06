@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/955dc75a-6dcc-487f-9081-ed9434895b36
 - Capture status and game round-trip latency shown directly on the overlay.
 - Interactive, click-through, and hidden overlay modes, plus configurable global shortcuts for display mode and battle reset.
 - UI scale, topmost behavior, visible row count, sorting, metric visibility, compact numbers, and player-name display settings.
-- Traditional Chinese, English, and Korean UI and game-data display.
+- Traditional Chinese, English, and Korean UI, configured independently from game resource language. PURPLE resources support these three languages; Steam resources support English, Korean, German, Spanish, French, Japanese, Portuguese, and Russian.
 - Automatic update checks and downloads for Velopack-managed releases.
 
 ## Requirements
@@ -52,6 +52,7 @@ Other release files and version history are available on [GitHub Releases](https
 
 1. Download the latest release and unpack it if necessary.
 2. Launch `Aion2Flow.exe` and accept the Windows administrator prompt.
+   Select **PURPLE (KR/TW)** or **Steam** under **Settings → Game client**. Switching automatically archives the current scene and applies the new client without restarting the app. Resource languages follow that client; interface language has its own setting.
 3. Start AION 2. Aion2Flow waits for `Aion2.exe`, detects the active game connection, and begins updating when combat data arrives.
 4. Check the three status indicators at the bottom of the overlay if no data appears: capture driver, game port, and battle connection.
 
@@ -93,22 +94,9 @@ src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
 
 ## Current Limitations
 
+- Steam support covers observed map loads and instance boundaries, NPC identity/HP, explicit summon ownership, common combat records, player profiles and round-trip latency. Party/force metadata and other unproved protocol variants remain unsupported.
 - Experimental playback and encounter history are available only for encounters captured during the current app session.
 - If Aion2Flow starts after the game, it may miss initial data and temporarily be unable to show some names, icons, boss HP values, or scene names. Return to character selection and re-enter the game, or teleport once, to refresh that data. Content may still be unavailable when the bundled display data has not yet been updated for the current game version.
 - A game update can change combat data and temporarily affect statistics. Install the latest Aion2Flow release after major client updates.
 
 This project is not affiliated with, endorsed by, or sponsored by NCSOFT or any AION 2 publisher.
-
-## Sponsor
-
-If Aion2Flow helps you, you can support development through Ko-fi or WeChat.
-
-<p>
-  <a href="https://ko-fi.com/cloris">
-    <img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg">
-  </a>
-</p>
-
-<p>
-  <img alt="WeChat reward QR code" src="https://raw.githubusercontent.com/cloris-chan/.github/main/assets/sponsors/wechat-reward.png" width="180">
-</p>

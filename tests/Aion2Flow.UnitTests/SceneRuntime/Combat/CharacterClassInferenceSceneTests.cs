@@ -1,4 +1,6 @@
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -6,11 +8,13 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class CharacterClassInferenceSceneTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Does_Not_Infer_CharacterClass_From_Periodic_Self_Proc()
     {
-        CombatResourceRegistry.LoadSkillMap("en-US");
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("en-US"));
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 101;
         const int targetId = 9001;
 
@@ -43,8 +47,8 @@ public sealed class CharacterClassInferenceSceneTests
     [Fact]
     public void Prefers_Offensive_Class_Evidence_Over_Sprint_Mantra_Proc()
     {
-        CombatResourceRegistry.LoadSkillMap("en-US");
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("en-US"));
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 102;
         const int targetId = 9002;
 
@@ -77,8 +81,8 @@ public sealed class CharacterClassInferenceSceneTests
     [Fact]
     public void DamageContribution_Includes_PreInference_Damage_When_Class_Is_Inferred_Later()
     {
-        CombatResourceRegistry.LoadSkillMap("en-US");
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load("en-US"));
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 103;
         const int targetId = 9003;
 
@@ -112,10 +116,10 @@ public sealed class CharacterClassInferenceSceneTests
     }
 
     [Fact]
-    public void CharacterClassEvidence_Rebuilds_When_SkillMap_Arrives_After_Combat()
+    public void CharacterClassEvidence_KeepsOriginatingSessionResources()
     {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load(ResourceLanguage.English));
+        using var scene = new SceneTestHarness(_clientContext);
         const int playerId = 10408;
         const int targetId = 9004;
         const int lateSkillCode = 997_060_233;
@@ -142,7 +146,7 @@ public sealed class CharacterClassInferenceSceneTests
         Assert.True(snapshotBeforeResources.Combatants.TryGetValue(playerId, out var beforeResources));
         Assert.Null(beforeResources.CharacterClass);
 
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(lateSkillCode, "Thunderbolt MAX", SkillCategory.Cleric, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
@@ -150,20 +154,28 @@ public sealed class CharacterClassInferenceSceneTests
         var snapshotAfterResources = scene.CreateSnapshot();
 
         Assert.True(snapshotAfterResources.Combatants.TryGetValue(playerId, out var afterResources));
-        Assert.Equal(CharacterClass.Cleric, afterResources.CharacterClass);
+        Assert.Null(afterResources.CharacterClass);
         Assert.Equal(813_802, afterResources.DamageAmount);
+
+        using var nextScene = new SceneTestHarness(_clientContext);
+        nextScene.AppendCombatWireObservation(playerId, targetId, in firstDamage, 1_000);
+        nextScene.AppendCombatWireObservation(playerId, targetId, in secondDamage, 2_000);
+        var nextSnapshot = nextScene.CreateSnapshot();
+        Assert.Equal(CharacterClass.Cleric, nextSnapshot.Combatants[playerId].CharacterClass);
+        Assert.Same(snapshotBeforeResources.ClientContext, snapshotAfterResources.ClientContext);
+        Assert.NotSame(snapshotBeforeResources.ClientContext, nextSnapshot.ClientContext);
     }
 
     [Fact]
     public void Ignores_Derived_Regeneration_ClassEvidence_And_Uses_Direct_Damage_Evidence()
     {
-        CombatResourceTestFixture.SetResources(
+        _clientContext = CombatResourceTestFixture.CreateContext(
         [
             new SkillDisplayEntry(13352450, "Heart Gore", SkillCategory.Assassin, SkillSourceType.PcSkill),
             new SkillDisplayEntry(16190040, "Enhance: Spirit's Benediction", SkillCategory.Elementalist, SkillSourceType.PcSkill)
         ], new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int assassinId = 9942;
         const int playerId = 10190;
         const int targetId = 12225;

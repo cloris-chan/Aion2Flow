@@ -10,6 +10,8 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 public sealed class BossSceneCollectionTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     private static readonly DateTimeOffset Started = new(2026, 6, 13, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
@@ -115,7 +117,7 @@ public sealed class BossSceneCollectionTests
     public void StandardResetRehydratesActiveBossStateBeforeNextCombat()
     {
         var timeProvider = new MutableTimeProvider(Started);
-        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var scene = new SceneLiveReadModel(Started, timeProvider, null, null, _clientContext);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Player", 10);
         AppendNpc(sink, 300, 2_100_002, NpcKind.Boss, 20);
@@ -148,7 +150,7 @@ public sealed class BossSceneCollectionTests
     public void StandardMapTransitionRequiresNewMapBossStateBeforeFirstCombat()
     {
         var timeProvider = new MutableTimeProvider(Started);
-        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var scene = new SceneLiveReadModel(Started, timeProvider, null, null, _clientContext);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         sink.SetCurrentMap(Source(1), 200_003);
         Assert.True(scene.TryDequeueMapTransition(out var initialArchive));
@@ -225,7 +227,7 @@ public sealed class BossSceneCollectionTests
     public void FirstCatalogResolvedCityTrainingDummyCombatStartsBossModeScene()
     {
         var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        CombatResourceTestFixture.SetResources([], catalog);
+        _clientContext = CombatResourceTestFixture.CreateContext([], catalog);
         var scene = CreateBossScene();
         var waitingEncounterId = scene.SessionId;
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -346,7 +348,7 @@ public sealed class BossSceneCollectionTests
     public void StandardSceneActivityTimeoutUsesConfiguredPlayerScope()
     {
         var timeProvider = new MutableTimeProvider(Started);
-        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var scene = new SceneLiveReadModel(Started, timeProvider, null, null, _clientContext);
         scene.SetCombatantStatisticsScope(CombatantStatisticsScope.Self);
         var sink = SceneSinkFactory.CreateForLive(scene)();
         AppendPlayer(sink, 100, "Local", 10, isLocalPlayer: true);
@@ -667,12 +669,12 @@ public sealed class BossSceneCollectionTests
         Assert.Equal(BossSceneState.Frozen, scene.BossState);
     }
 
-    private static SceneLiveReadModel CreateBossScene() => CreateBossScene(out _);
+    private SceneLiveReadModel CreateBossScene() => CreateBossScene(out _);
 
-    private static SceneLiveReadModel CreateBossScene(out MutableTimeProvider timeProvider)
+    private SceneLiveReadModel CreateBossScene(out MutableTimeProvider timeProvider)
     {
         timeProvider = new MutableTimeProvider(Started);
-        var scene = new SceneLiveReadModel(Started, timeProvider);
+        var scene = new SceneLiveReadModel(Started, timeProvider, null, null, _clientContext);
         scene.ChangeKind(SceneKind.Boss, Started, archiveCurrent: false);
         return scene;
     }

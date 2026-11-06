@@ -253,7 +253,7 @@ public sealed class ScenePlaybackSession
             _kind = kind;
             _segment = segment;
             _timeRange = timeRange;
-            _projection = SceneProjectionState.Create(_encounterId);
+            _projection = SceneProjectionState.Create(_encounterId, clientContext: segment.ClientContext);
             _tracks = [];
             _materializedTracks = [];
             _cursor = segment.CreateCursor();
@@ -267,7 +267,7 @@ public sealed class ScenePlaybackSession
             _trackedMechanicEventCount = 0;
             _trackedResourceEventCount = 0;
             _hasTrackProjectionVersion = false;
-            _materializedEventIndex = new ScenePlaybackMaterializedEventIndex();
+            _materializedEventIndex = new ScenePlaybackMaterializedEventIndex(segment.ClientContext.CombatResources);
         }
 
         public SceneJournalSegment Segment => _segment;

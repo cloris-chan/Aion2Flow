@@ -2,7 +2,6 @@ using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
-using Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -17,7 +16,8 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             return;
         }
 
-        var hasCatalogEntry = CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var entry);
+        var resources = sink.ClientContext.CombatResources;
+        var hasCatalogEntry = resources.TryResolveNpcCatalogEntry(npcCode, out var entry);
         if (requireCatalogEntry && !hasCatalogEntry)
         {
             return;
@@ -28,7 +28,7 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             sink.TryGetNpcRuntimeState(lifecycleId, out var existing) &&
             existing.NpcCode is int existingCode &&
             existingCode != npcCode &&
-            CombatResourceRegistry.TryResolveNpcCatalogEntry(existingCode, out _))
+            resources.TryResolveNpcCatalogEntry(existingCode, out _))
         {
             sink.RebindInstanceLifecycle(instanceId);
         }
@@ -56,30 +56,6 @@ internal sealed class SceneObservationWriter(IRuntimeObservationSink sink)
             sink.EnsureUnknownMapScope(in packet);
         }
 
-        return true;
-    }
-
-    public bool ApplyCurrentMapFromCompositeSceneState(in PacketObservationSource packet, uint value, out bool mapScopeStarted)
-    {
-        mapScopeStarted = false;
-        if (!SceneMapIdClassifier.IsKnownMapId(value))
-        {
-            return false;
-        }
-
-        mapScopeStarted = sink.StageMapCandidate(in packet, value);
-        return true;
-    }
-
-    public bool StageMapCandidateFromCompositeSceneState(in PacketObservationSource packet, uint value, out bool mapScopeStarted)
-    {
-        mapScopeStarted = false;
-        if (!SceneMapIdClassifier.IsKnownMapId(value))
-        {
-            return false;
-        }
-
-        mapScopeStarted = sink.StageMapCandidate(in packet, value);
         return true;
     }
 }

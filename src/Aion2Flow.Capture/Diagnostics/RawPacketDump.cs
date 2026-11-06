@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using Cloris.Aion2Flow.Capture.Streams;
+using Cloris.Aion2Flow.SceneRuntime;
 
 namespace Cloris.Aion2Flow.Capture.Diagnostics;
 
@@ -19,10 +20,22 @@ internal static class RawPacketDump
     private static StreamWriter? _rawWriter;
     private static StreamWriter? _streamWriter;
     private static DateTimeOffset _currentSessionStarted = DateTimeOffset.Now;
+    private static SceneClientContext? _clientContext;
 
     public static string RawLogPath => _rawLogPath;
     public static string StreamLogPath => _streamLogPath;
     public static DateTimeOffset CurrentSessionStarted => _currentSessionStarted;
+
+    public static void ConfigureClientContext(SceneClientContext clientContext)
+    {
+        ArgumentNullException.ThrowIfNull(clientContext);
+        lock (SyncRoot)
+        {
+            _clientContext = clientContext;
+            if (IsEnabled && !string.IsNullOrEmpty(_streamLogPath))
+                CaptureClientMetadata.Write(Path.GetDirectoryName(_streamLogPath)!, clientContext);
+        }
+    }
 
     public static void ConfigureLogDirectory(string logDirectory)
     {
@@ -32,27 +45,39 @@ internal static class RawPacketDump
 
     public static DateTimeOffset RotateLogs()
     {
-        var sessionStarted = DateTimeOffset.Now;
+        lock (SyncRoot)
+            return RotateLogsCore();
+    }
 
+    public static DateTimeOffset RotateLogs(SceneClientContext clientContext)
+    {
+        ArgumentNullException.ThrowIfNull(clientContext);
         lock (SyncRoot)
         {
-            _currentSessionStarted = sessionStarted;
-            if (!IsEnabled)
-            {
-                return sessionStarted;
-            }
-
-            DisposeWriter(ref _rawWriter);
-            DisposeWriter(ref _streamWriter);
-
-            var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, sessionStarted);
-            Directory.CreateDirectory(sessionDirectory);
-            _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
-            _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
-
-            _rawWriter = CreateWriter(_rawLogPath);
-            _streamWriter = CreateWriter(_streamLogPath);
+            _clientContext = clientContext;
+            return RotateLogsCore();
         }
+    }
+
+    private static DateTimeOffset RotateLogsCore()
+    {
+        var sessionStarted = DateTimeOffset.Now;
+        _currentSessionStarted = sessionStarted;
+        if (!IsEnabled)
+            return sessionStarted;
+
+        DisposeWriter(ref _rawWriter);
+        DisposeWriter(ref _streamWriter);
+
+        var sessionDirectory = ResolveUniqueDumpLogDirectory(_logRootDirectory, sessionStarted);
+        Directory.CreateDirectory(sessionDirectory);
+        _rawLogPath = Path.Combine(sessionDirectory, "raw.log");
+        _streamLogPath = Path.Combine(sessionDirectory, "stream.log");
+
+        _rawWriter = CreateWriter(_rawLogPath);
+        _streamWriter = CreateWriter(_streamLogPath);
+        if (_clientContext is not null)
+            CaptureClientMetadata.Write(sessionDirectory, _clientContext);
 
         return sessionStarted;
     }

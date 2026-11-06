@@ -13,6 +13,7 @@ internal sealed class PacketFrameParser : IDisposable
     private readonly SceneObservationWriter _writer;
     private readonly PacketFlushState _flushState;
     private readonly PacketPlayerGroupState _playerGroupState;
+    private readonly ClientPacketProtocol _protocol;
     private byte[]? _decompressionBuffer;
 
     private static ReadOnlySpan<byte> Pattern => PacketTransportCodec.Pattern;
@@ -24,6 +25,7 @@ internal sealed class PacketFrameParser : IDisposable
         PacketPlayerGroupState? playerGroupState = null)
     {
         _sink = sink;
+        _protocol = ClientPacketProtocol.Resolve(sink.ClientContext.Profile);
         _protocolRoundTripObserver = protocolRoundTripObserver;
         _writer = new SceneObservationWriter(sink);
         _flushState = flushState ?? new PacketFlushState();
@@ -54,6 +56,7 @@ internal sealed class PacketFrameParser : IDisposable
         var context = new PacketParseContext(
             _sink,
             _writer,
+            _protocol,
             _flushState,
             _playerGroupState,
             _protocolRoundTripObserver,
@@ -354,7 +357,7 @@ internal sealed class PacketFrameParser : IDisposable
     private static bool ParsePerfectPacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (packet.Length < 3) return false;
-        return PacketOpcodeDispatcher.TryParseExactFrame(packet, ref context);
+        return context.Protocol.ParseFrame(packet, ref context);
     }
 
     private void ParseUnknownFramePayload(ReadOnlySpan<byte> framePayload, ref PacketParseContext context)
@@ -379,7 +382,7 @@ internal sealed class PacketFrameParser : IDisposable
                     return;
                 }
 
-                if (PacketUnknownFramePayloadScanner.Scan(body, ref context))
+                if (_protocol.ScanUnknownFrame(body, ref context))
                 {
                     return;
                 }
@@ -393,7 +396,7 @@ internal sealed class PacketFrameParser : IDisposable
         var payloadPrevious = context.EnterStructure(PacketStructureKind.UnknownFramePayload, 0, framePayload.Length, 0, framePayload.Length, 1);
         try
         {
-            if (PacketUnknownFramePayloadScanner.Scan(framePayload, ref context))
+            if (_protocol.ScanUnknownFrame(framePayload, ref context))
             {
                 return;
             }
@@ -454,7 +457,7 @@ internal sealed class PacketFrameParser : IDisposable
 
         try
         {
-            return PacketOpcodeDispatcher.ParseFramePayload(payload, ref context);
+            return _protocol.ParseFrame(payload, ref context);
         }
         finally
         {
@@ -467,7 +470,7 @@ internal sealed class PacketFrameParser : IDisposable
         var previousRecovery = context.EnterStructure(PacketStructureKind.RecoveryPayload, 0, packet.Length, 0, packet.Length, 0);
         try
         {
-            var parsed = PacketRecoveryParser.ParseRecoveryPacket(packet, ref context, out var nestedOffset);
+            var parsed = _protocol.ParseRecovery(packet, ref context, out var nestedOffset);
             if (nestedOffset >= 0 && nestedOffset < packet.Length)
             {
                 var previous = context.EnterStructure(PacketStructureKind.NestedTransportPacket, nestedOffset, packet.Length - nestedOffset, 0, packet.Length - nestedOffset, 0);

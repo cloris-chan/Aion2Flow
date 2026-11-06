@@ -1,3 +1,5 @@
+using Cloris.Aion2Flow.Clients;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
@@ -6,11 +8,13 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class SummonAttributionSceneTests
 {
+    private SceneClientContext _clientContext = SceneClientContext.Purple;
+
     [Fact]
     public void Attributes_Summon_Damage_To_Owner_In_Snapshot()
     {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-        using var scene = new SceneTestHarness();
+        _clientContext = new(ClientProfiles.Purple, ResourceCatalog.Load(ResourceLanguage.English));
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 12115;
         const int summonId = 18345;
         const int targetId = 17640;
@@ -45,9 +49,9 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void SummonLike_Source_Remains_Independent_Without_Packet_Ownership()
     {
-        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 10389;
         const int summonId = 26765;
         const int targetId = 163760;
@@ -71,9 +75,9 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Spirit_Descent_Summon_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 1734;
         const int summonId = 76631;
         const int targetId = 110150;
@@ -93,7 +97,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Owner_To_Known_Summon_Resource_Value_Is_Suppressed_From_Combat()
     {
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 1734;
         const int summonId = 76631;
 
@@ -119,7 +123,7 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Known_Summon_To_Owner_Resource_Value_Is_Suppressed_From_Combat()
     {
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 1734;
         const int summonId = 76631;
 
@@ -145,9 +149,9 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Repeated_Spirit_Descent_Summon_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 314;
         const int summonId = 34799;
         const int targetId = 23089;
@@ -169,9 +173,9 @@ public sealed class SummonAttributionSceneTests
     [Fact]
     public void Wind_Spirit_Descent_Restore_Does_Not_Create_Combat_Contribution()
     {
-        CombatResourceTestFixture.SetResources(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
+        _clientContext = CombatResourceTestFixture.CreateContext(BuildElementalistSummonSkillMap(), new Dictionary<int, NpcDisplayEntry>());
 
-        using var scene = new SceneTestHarness();
+        using var scene = new SceneTestHarness(_clientContext);
         const int ownerId = 314;
         const int summonId = 21821;
         const int targetId = 23089;

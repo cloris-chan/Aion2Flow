@@ -8,14 +8,15 @@ namespace Cloris.Aion2Flow.Tests;
 
 public sealed class SceneTestHarness : IDisposable
 {
-    private readonly ReplaySinkHolder _holder = SceneSinkFactory.CreateForReplay();
+    private readonly ReplaySinkHolder _holder;
     private readonly IRuntimeObservationSink _sink;
     private long _timestamp = 1_000;
     private long _flushId;
     private long _completedFlushId;
 
-    public SceneTestHarness()
+    public SceneTestHarness(SceneClientContext? clientContext = null)
     {
+        _holder = SceneSinkFactory.CreateForReplay(clientContext);
         _sink = new HarnessSink(this, _holder.Sink);
     }
 
@@ -137,6 +138,7 @@ public sealed class SceneTestHarness : IDisposable
 
     private sealed class HarnessSink(SceneTestHarness owner, IRuntimeObservationSink inner) : IRuntimeObservationSink
     {
+        public SceneClientContext ClientContext => inner.ClientContext;
         public int CurrentTarget
         {
             get => inner.CurrentTarget;

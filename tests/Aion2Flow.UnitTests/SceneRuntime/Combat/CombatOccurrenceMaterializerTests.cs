@@ -5,10 +5,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime.Combat;
 
 public sealed class CombatOccurrenceMaterializerTests
 {
-    public CombatOccurrenceMaterializerTests()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-    }
 
     [Fact]
     public void Damage_MaterializesMetricAndMechanicIndependently()

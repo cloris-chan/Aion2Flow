@@ -41,9 +41,10 @@ public readonly record struct AuraSemanticValue(
 
 public static class AuraSemanticEvidenceResolver
 {
-    public static AuraSemanticValue Evaluate(ResourceEffectRef resourceEffectRef)
+    public static AuraSemanticValue Evaluate(ResourceEffectRef resourceEffectRef, CombatResourceRegistry? resources = null)
     {
-        if (!CombatResourceRegistry.TryResolveAuraResourceSemantics(resourceEffectRef, out var resolution))
+        resources ??= SceneClientContext.Purple.CombatResources;
+        if (!resources.TryResolveAuraResourceSemantics(resourceEffectRef, out var resolution))
         {
             return new AuraSemanticValue(
                 AuraDisposition.Unknown,

@@ -117,7 +117,7 @@ internal static class PacketUnknownFramePayloadScanner
         var previous = context.EnterStructure(PacketStructureKind.EmbeddedFrame, offset, frameLength, bodyOffset, frameLength - bodyOffset, siblingIndex);
         try
         {
-            return PacketOpcodeDispatcher.TryParseExactFrame(frame, ref context);
+            return context.Protocol.ParseFrame(frame, ref context);
         }
         finally
         {

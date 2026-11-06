@@ -1,5 +1,8 @@
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Services;
+using Cloris.Aion2Flow.Services.Settings;
 
 namespace Cloris.Aion2Flow.Tests.Resources;
 
@@ -9,70 +12,122 @@ public sealed class LocalizationServicesTests
     public void LocalizationService_Indexer_Updates_When_Language_Changes()
     {
         var languageService = new LanguageService();
-        languageService.SetLanguage(LanguageService.English);
         languageService.SetLanguage(LanguageService.TraditionalChinese);
         using var localization = new LocalizationService(languageService);
 
         Assert.Equal("就緒", localization["Status_Ready"]);
-
-        var changed = languageService.SetLanguage(LanguageService.English);
-
-        Assert.True(changed);
+        Assert.True(languageService.SetLanguage(LanguageService.English));
         Assert.Equal("Ready", localization["Status_Ready"]);
     }
 
     [Fact]
-    public void GameResourceService_Reloads_Skill_And_Npc_Names_When_Language_Changes()
+    public void InterfaceAndResourceLanguagesChangeIndependently()
     {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
+        using var fixture = new ResourceSettingsFixture();
+        using var localization = new LocalizationService(fixture.Language);
+        using var resources = new GameResourceService(fixture.ClientSettings);
+        var contextResources = resources.GetForClient(SceneClientContext.Purple);
+        var zh = ResourceCatalog.Load(ClientProfiles.Purple, ResourceLanguage.TraditionalChinese);
+        var en = ResourceCatalog.Load(ClientProfiles.Purple, ResourceLanguage.English);
+        Assert.True(zh.Skills.TryGetValue(2011101, out var zhSkill));
+        Assert.True(en.Skills.TryGetValue(2011101, out var enSkill));
+        Assert.Equal(zhSkill.Name, resources.ResolveSkillName(2011101));
+        Assert.Equal(zh.ResolveServerName(1001), resources.ResolveServerName(1001));
 
-            var zhSkills = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).Skills;
-            var enSkills = ResourceCatalog.Load(ResourceLanguage.English).Skills;
-            var zhCatalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-            var enCatalog = ResourceCatalog.Load(ResourceLanguage.English).NpcCatalog;
-            var zhServerNames = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).ServerNames;
-            var enServerNames = ResourceCatalog.Load(ResourceLanguage.English).ServerNames;
+        var resourcesChanged = 0;
+        resources.ResourcesChanged += (_, _) => resourcesChanged++;
+        fixture.Language.SetLanguage(LanguageService.Korean);
+        Assert.Equal(ResourceLanguage.TraditionalChinese, resources.CurrentLanguage);
+        Assert.Equal(0, resourcesChanged);
 
-            Assert.True(zhSkills.TryGetValue(2011101, out var zhSkill));
-            Assert.True(enSkills.TryGetValue(2011101, out var enSkill));
-            Assert.NotEqual(zhSkill.Name, enSkill.Name);
+        Assert.True(fixture.ClientSettings.SetResourceLanguage(ResourceLanguage.English));
+        Assert.Equal(LanguageService.Korean, fixture.Language.CurrentLanguage);
+        Assert.Equal(ResourceLanguage.English, resources.CurrentLanguage);
+        Assert.Equal(enSkill.Name, resources.ResolveSkillName(2011101));
+        Assert.Equal(en.NpcCatalog[2000002].Name, resources.ResolveNpcName(2000002));
+        Assert.Equal(en.ResolveServerName(1001), resources.ResolveServerName(1001));
+        Assert.Equal(en.ResolveShortServerName(1001), resources.ResolveShortServerName(1001));
+        Assert.Equal(ResourceLanguage.English, contextResources.CurrentLanguage);
+        Assert.Equal(1, resourcesChanged);
+        Assert.Equal(ResourceLanguage.English, fixture.Settings.Current.ResourceLanguage);
+    }
 
-            Assert.True(zhCatalog.TryGetValue(2000002, out var zhNpc));
-            Assert.True(enCatalog.TryGetValue(2000002, out var enNpc));
-            Assert.NotEqual(zhNpc.Name, enNpc.Name);
+    [Fact]
+    public void SwitchingClientSelectsItsOwnLocalesWithoutChangingInterfaceOrCapturedContext()
+    {
+        using var fixture = new ResourceSettingsFixture();
+        using var resources = new GameResourceService(fixture.ClientSettings);
+        var capturedPurple = resources.GetForClient(SceneClientContext.Purple);
 
-            Assert.True(zhServerNames.TryGetValue(1001, out var zhServer));
-            Assert.True(enServerNames.TryGetValue(1001, out var enServer));
-            Assert.NotEqual(zhServer.ServerName, enServer.ServerName);
+        Assert.True(fixture.ClientSettings.SetClientVersion(ClientVersion.Steam));
+        Assert.Equal(LanguageService.English, fixture.Language.CurrentLanguage);
+        Assert.Equal(ClientVersion.Steam, fixture.Settings.Current.ClientVersion);
+        Assert.Equal("steam", resources.Catalog.ResourceSet.Id);
+        Assert.Equal(ResourceLanguage.English, resources.CurrentLanguage);
+        Assert.Equal("purple", capturedPurple.Catalog.ResourceSet.Id);
+        Assert.DoesNotContain(ResourceLanguage.TraditionalChinese, fixture.ClientSettings.ResourceLanguages);
+        Assert.False(fixture.ClientSettings.SetResourceLanguage(ResourceLanguage.TraditionalChinese));
+        Assert.True(fixture.ClientSettings.SetResourceLanguage("ja-JP"));
+        Assert.Equal("ja-JP", resources.CurrentLanguage);
+        Assert.Equal(ResourceLanguage.English, capturedPurple.CurrentLanguage);
+        Assert.Equal(LanguageService.English, fixture.Language.CurrentLanguage);
 
-            Assert.Equal(zhSkill.Name, resources.ResolveSkillName(2011101));
-            Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var initialNpc));
-            Assert.Equal(zhNpc.Name, initialNpc.Name);
-            Assert.Equal(zhServer.ServerName, resources.ResolveServerName(1001));
-            Assert.Equal(zhServer.ShortServerName, resources.ResolveShortServerName(1001));
+        Assert.True(fixture.ClientSettings.SetClientVersion(ClientVersion.Purple));
+        Assert.Equal(ResourceLanguage.English, resources.CurrentLanguage);
+        Assert.Equal("purple", resources.Catalog.ResourceSet.Id);
+    }
 
-            string? changedLanguage = null;
-            resources.ResourcesChanged += (_, language) => changedLanguage = language;
+    [Fact]
+    public void ExistingLanguagePreferenceInitializesResourceLanguageOnce()
+    {
+        using var fixture = new ResourceSettingsFixture();
+        Assert.Equal(ResourceLanguage.TraditionalChinese, fixture.ClientSettings.ResourceLanguage);
+        fixture.Settings.Update(settings => settings.Language = LanguageService.English);
+        Assert.Equal(ResourceLanguage.TraditionalChinese, fixture.ClientSettings.ResourceLanguage);
+        using var restored = new ClientSettingsService(new SettingsService(fixture.Settings.FilePath), fixture.Language);
+        Assert.Equal(ResourceLanguage.TraditionalChinese, restored.ResourceLanguage);
+        Assert.Equal(ResourceCatalog.GetResourceSet(ClientProfiles.Purple).Languages, restored.ResourceLanguages);
+        Assert.False(restored.SetResourceLanguage("ja-JP"));
+    }
 
-            var switched = languageService.SetLanguage(LanguageService.English);
+    [Fact]
+    public void ContextResourceViewsArePinnedAndReused()
+    {
+        using var fixture = new ResourceSettingsFixture();
+        using var resources = new GameResourceService(fixture.ClientSettings);
+        var context = SceneClientContext.Purple;
+        var pinned = resources.GetForClient(context);
+        Assert.Same(pinned, resources.GetForClient(context));
+        Assert.Same(pinned, pinned.GetForClient(context));
+        Assert.Same(context, pinned.ClientContext);
+        Assert.Same(context.CombatResources, pinned.CombatResources);
+        Assert.Same(context.Resources.Shared, pinned.Catalog.Shared);
+    }
 
-            Assert.True(switched);
-            Assert.Equal(LanguageService.English, changedLanguage);
-            Assert.Equal(enSkill.Name, resources.ResolveSkillName(2011101));
-            Assert.True(resources.TryResolveNpcCatalogEntry(2000002, out var updatedNpc));
-            Assert.Equal(enNpc.Name, updatedNpc.Name);
-            Assert.Equal(enServer.ServerName, resources.ResolveServerName(1001));
-            Assert.Equal(enServer.ShortServerName, resources.ResolveShortServerName(1001));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
+    [Fact]
+    public void DistinctOriginCatalogsInSameResourceSetKeepTheirOwnResources()
+    {
+        using var fixture = new ResourceSettingsFixture();
+        fixture.ClientSettings.SetResourceLanguage(ResourceLanguage.English);
+        using var resources = new GameResourceService(fixture.ClientSettings);
+        const int skillId = 999_999_991;
+        var first = CombatResourceTestFixture.CreateContext(
+            [new SkillDisplayEntry(skillId, "First", SkillCategory.Gladiator, SkillSourceType.PcSkill)],
+            new Dictionary<int, NpcDisplayEntry>());
+        var second = CombatResourceTestFixture.CreateContext(
+            [new SkillDisplayEntry(skillId, "Second", SkillCategory.Gladiator, SkillSourceType.PcSkill)],
+            new Dictionary<int, NpcDisplayEntry>());
+        var firstView = resources.GetForClient(first);
+        var secondView = resources.GetForClient(second);
+
+        Assert.NotSame(firstView, secondView);
+        Assert.Equal("First", firstView.ResolveSkillName(skillId));
+        Assert.Equal("Second", secondView.ResolveSkillName(skillId));
+        fixture.ClientSettings.SetResourceLanguage(ResourceLanguage.TraditionalChinese);
+        Assert.Same(first.Resources.Shared, firstView.Catalog.Shared);
+        Assert.Same(second.Resources.Shared, secondView.Catalog.Shared);
+        Assert.Same(first.CombatResources, firstView.CombatResources);
+        Assert.Same(second.CombatResources, secondView.CombatResources);
     }
 
     [Theory]
@@ -102,29 +157,15 @@ public sealed class LocalizationServicesTests
     [InlineData(1607400, "攻擊", "ICON_TE_SKILL_001.webp")]
     public void GameResourceService_Resolves_Display_Names_And_Icons(int skillCode, string expectedName, string expectedIcon)
     {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
-
-            Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
-            Assert.Equal(expectedIcon, resources.ResolveSkillIconAssetName(skillCode));
-        }
-        finally
-        {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
-        }
+        using var resources = new GameResourceService(ClientProfiles.Purple, ResourceLanguage.TraditionalChinese);
+        Assert.Equal(expectedName, resources.ResolveSkillName(skillCode));
+        Assert.Equal($"purple/{expectedIcon}", resources.ResolveSkillIconAssetName(skillCode));
     }
 
     [Fact]
     public void GameResourceService_Resolves_RowBase_For_SameFamily_Skill()
     {
-        var languageService = new LanguageService();
-        languageService.SetLanguage(LanguageService.TraditionalChinese);
-        using var resources = new GameResourceService(languageService);
-
+        using var resources = new GameResourceService(ClientProfiles.Purple, ResourceLanguage.TraditionalChinese);
         Assert.Equal(13_160_000, resources.ResolveBaseSkillIdForCode(13_160_007));
         Assert.Equal(13_160_000, resources.ResolveBaseSkillIdForCode(13_160_000));
     }
@@ -136,10 +177,7 @@ public sealed class LocalizationServicesTests
     [InlineData(3_001_110, false)]
     public void GameResourceService_Identifies_Player_Profession_Skills(int skillCode, bool expected)
     {
-        var languageService = new LanguageService();
-        languageService.SetLanguage(LanguageService.TraditionalChinese);
-        using var resources = new GameResourceService(languageService);
-
+        using var resources = new GameResourceService(ClientProfiles.Purple, ResourceLanguage.TraditionalChinese);
         Assert.Equal(expected, resources.IsPlayerProfessionSkill(skillCode));
     }
 
@@ -152,18 +190,30 @@ public sealed class LocalizationServicesTests
     [InlineData(13050000, "閃光斬")]
     public void GameResourceService_Resolves_Runtime_Aura_And_Cooldown_RowBase_Ids(int resourceId, string expectedName)
     {
-        try
-        {
-            var languageService = new LanguageService();
-            languageService.SetLanguage(LanguageService.English);
-            languageService.SetLanguage(LanguageService.TraditionalChinese);
-            using var resources = new GameResourceService(languageService);
+        using var resources = new GameResourceService(ClientProfiles.Purple, ResourceLanguage.TraditionalChinese);
+        Assert.Equal(expectedName, resources.ResolveSkillName(resourceId));
+    }
 
-            Assert.Equal(expectedName, resources.ResolveSkillName(resourceId));
-        }
-        finally
+    private sealed class ResourceSettingsFixture : IDisposable
+    {
+        public ResourceSettingsFixture()
         {
-            CombatResourceRegistry.LoadSkillMap(LanguageService.TraditionalChinese);
+            var path = Path.Combine(Path.GetTempPath(), $"aion2flow-resources-{Guid.NewGuid():N}.json");
+            Settings = new SettingsService(path);
+            Settings.Update(settings => settings.Language = LanguageService.TraditionalChinese);
+            Language = new LanguageService();
+            Language.SetLanguage(LanguageService.English);
+            ClientSettings = new ClientSettingsService(Settings, Language);
+        }
+
+        public SettingsService Settings { get; }
+        public LanguageService Language { get; }
+        public ClientSettingsService ClientSettings { get; }
+
+        public void Dispose()
+        {
+            ClientSettings.Dispose();
+            File.Delete(Settings.FilePath);
         }
     }
 }

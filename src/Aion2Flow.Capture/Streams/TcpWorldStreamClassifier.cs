@@ -12,13 +12,13 @@ internal enum TcpWorldStreamClassification : byte
     Rejected
 }
 
-internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : IDisposable
+internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery, ClientPacketProtocol? protocol = null) : IDisposable
 {
     private const int MaximumFrameLength = CaptureBufferLimits.StreamTailBufferSize;
     private const int MaximumDecompressedLength = 4 * 1024 * 1024;
     private const int MaximumInnerFrameCount = 4096;
-    private const long MaximumClockDifferenceMilliseconds = 60_000;
-    private readonly PacketTransportStreamDeframer _transport = new();
+    private readonly ClientPacketProtocol _protocol = protocol ?? ClientPacketProtocol.Purple;
+    private readonly PacketTransportStreamDeframer _transport = new(protocol: protocol);
     private bool _hasCanonicalAlignment = !allowMidstreamRecovery;
     private int _consecutiveGameplayFrames;
     private int _recoveryScanOffset;
@@ -76,7 +76,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         _transport.Dispose();
     }
 
-    public static bool IsPlausibleConnectionStart(ReadOnlySpan<byte> payload)
+    public static bool IsPlausibleConnectionStart(ReadOnlySpan<byte> payload, ClientPacketProtocol? protocol = null)
     {
         if (payload.IsEmpty)
         {
@@ -85,7 +85,8 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
 
         var lengthPrefixed = PacketTransportCodec.ProbeLengthPrefixedStream(
             payload,
-            PacketTransportCodec.MaximumEnvelopeBodyLength);
+            PacketTransportCodec.MaximumEnvelopeBodyLength,
+            protocol);
         if (lengthPrefixed.Kind != PacketLengthPrefixedProbeKind.Invalid)
         {
             return true;
@@ -106,18 +107,6 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         };
     }
 
-    internal static bool IsConfirmed0036(ReadOnlySpan<byte> frame, long completionCaptureMilliseconds)
-    {
-        if (frame.Length != 11 || frame[0] != 0x0e || frame[1] != 0x00 || frame[2] != 0x36)
-        {
-            return false;
-        }
-
-        var serverMilliseconds = BinaryPrimitives.ReadInt64LittleEndian(frame[3..]);
-        return serverMilliseconds >= completionCaptureMilliseconds - MaximumClockDifferenceMilliseconds &&
-               serverMilliseconds <= completionCaptureMilliseconds + MaximumClockDifferenceMilliseconds;
-    }
-
     private TcpWorldStreamClassification ClassifyAvailableFrames(long completionCaptureMilliseconds)
     {
         while (true)
@@ -129,7 +118,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
                 {
                     var pendingData = _transport.RawData;
                     if (tickOffset <= pendingData.Length - 11 &&
-                        IsConfirmed0036(
+                        _protocol.IsConfirmedServerTick(
                             pendingData.Slice(tickOffset, 11),
                             completionCaptureMilliseconds))
                     {
@@ -258,7 +247,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
                 return TcpWorldStreamClassification.Rejected;
             }
 
-            if (PacketTransportCodec.IsKnownGameplayOpcode(opcode0, opcode1))
+            if (_protocol.IsKnownGameplayOpcode(opcode0, opcode1))
             {
                 HasProtocolEvidence = true;
                 EstablishCanonicalAlignment();
@@ -287,13 +276,14 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         var payload = _transport.RawData;
         var lengthPrefixed = PacketTransportCodec.ProbeLengthPrefixedStreamBoundary(
             payload,
-            PacketTransportCodec.MaximumEnvelopeBodyLength);
+            PacketTransportCodec.MaximumEnvelopeBodyLength,
+            _protocol);
         if (lengthPrefixed.Kind == PacketLengthPrefixedBoundaryProbeKind.Ambiguous)
         {
             var tickOffset = lengthPrefixed.DirectRecoveryTickOffset;
             if (tickOffset >= 0 &&
                 tickOffset <= payload.Length - 11 &&
-                IsConfirmed0036(
+                _protocol.IsConfirmedServerTick(
                     payload.Slice(tickOffset, 11),
                     completionCaptureMilliseconds))
             {
@@ -339,7 +329,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         var pendingTickOffset = -1;
         for (var offset = _recoveryScanOffset; offset <= scanEnd; offset++)
         {
-            if (IsConfirmed0036(payload.Slice(offset, tickFrameLength), completionCaptureMilliseconds))
+            if (_protocol.IsConfirmedServerTick(payload.Slice(offset, tickFrameLength), completionCaptureMilliseconds))
             {
                 var hasAmbiguousLengthPrefixedBoundary =
                     hasPendingLengthPrefixedBoundary ||
@@ -414,11 +404,11 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         return RecoveryResult.Pending;
     }
 
-    private static bool HasRecognizedCanonicalContinuation(ReadOnlySpan<byte> payload)
+    private bool HasRecognizedCanonicalContinuation(ReadOnlySpan<byte> payload)
     {
         var frame = PacketTransportCodec.ProbeCanonicalFrame(payload, MaximumFrameLength);
         return frame.Kind == PacketCanonicalFrameProbeKind.Complete &&
-               PacketTransportCodec.HasRecognizedCanonicalFrameStart(payload, in frame);
+               PacketTransportCodec.HasRecognizedCanonicalFrameStart(payload, in frame, _protocol);
     }
 
     private static bool IsCompleteCanonicalSequence(ReadOnlySpan<byte> payload)
@@ -482,32 +472,15 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         }
 
         var opcodeOffset = frame.PrefixLength;
-        HasProtocolEvidence = PacketTransportCodec.IsKnownGameplayOpcode(
+        HasProtocolEvidence = _protocol.IsKnownGameplayOpcode(
             data[opcodeOffset],
             data[opcodeOffset + 1]);
     }
 
-    private static bool IsStrongWorldFrame(ReadOnlySpan<byte> frame, int prefixLength, long completionCaptureMilliseconds)
-    {
-        if (IsConfirmed0036(frame, completionCaptureMilliseconds))
-        {
-            return true;
-        }
+    private bool IsStrongWorldFrame(ReadOnlySpan<byte> frame, int prefixLength, long completionCaptureMilliseconds)
+        => _protocol.IsStrongWorldFrame(frame, prefixLength, completionCaptureMilliseconds);
 
-        var opcode0 = frame[prefixLength];
-        var opcode1 = frame[prefixLength + 1];
-        return (opcode0, opcode1) switch
-        {
-            (0x03, 0x36) =>
-                Packet0336RoundTripParser.TryParse(frame, out _),
-            (0x33, 0x36) => Packet3336NicknameParser.TryParse(frame, out _),
-            (0x45, 0x36) => Packet4536PcMetadataParser.TryParse(frame, out _),
-            (0x04, 0x8d) => Packet048DNicknameParser.TryParse(frame, out _),
-            _ => false
-        };
-    }
-
-    private static CompressedBatchProbe ClassifyCompressedBatch(
+    private CompressedBatchProbe ClassifyCompressedBatch(
         ReadOnlySpan<byte> frame,
         int prefixLength,
         long completionCaptureMilliseconds,
@@ -561,7 +534,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
         }
     }
 
-    private static CompressedBatchProbe ClassifyInnerFrameBatch(
+    private CompressedBatchProbe ClassifyInnerFrameBatch(
         ReadOnlySpan<byte> payload,
         long completionCaptureMilliseconds,
         int precedingGameplayFrameCount)
@@ -602,7 +575,7 @@ internal sealed class TcpWorldStreamClassifier(bool allowMidstreamRecovery) : ID
                 hasStrongWorldFrame = true;
             }
 
-            if (PacketTransportCodec.IsKnownGameplayOpcode(opcode0, opcode1))
+            if (_protocol.IsKnownGameplayOpcode(opcode0, opcode1))
             {
                 hasGameplayFrame = true;
                 containsOnlyServiceFrames = false;

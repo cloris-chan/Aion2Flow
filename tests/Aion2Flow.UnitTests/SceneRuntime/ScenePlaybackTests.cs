@@ -1737,6 +1737,8 @@ public sealed class ScenePlaybackTests
 
         public Guid EncounterId => _inner.EncounterId;
 
+        public SceneClientContext ClientContext => _inner.ClientContext;
+
         public DateTimeOffset SceneStarted => _inner.SceneStarted;
 
         public ScenePlaybackSourceKind SourceKind => _inner.SourceKind;

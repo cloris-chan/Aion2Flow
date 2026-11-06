@@ -5,8 +5,10 @@ using Avalonia.Media.Immutable;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Collections;
 using Cloris.Aion2Flow.Presentation;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
@@ -73,6 +75,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private long _lastCaptureIndicatorRefreshTimestampTicks = long.MinValue;
     private volatile bool _suppressRefresh;
     private bool _isDisposed;
+    private bool _isChangingClient;
 
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
@@ -279,7 +282,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantSortMetric))
+        if (e.PropertyName == nameof(SettingsFlyoutViewModel.SelectedClientVersion))
+            _ = ChangeClientAsync();
+        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantSortMetric))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
         else if (e.PropertyName == nameof(SettingsFlyoutViewModel.SceneKind))
             Dispatcher.UIThread.Post(ChangeSceneKind);
@@ -751,8 +756,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     group.Representative.InstanceId,
                     group.NpcCode,
                     group.InstanceCount,
-                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
-                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp, DisplayContext?.Resources.CombatResources),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp, DisplayContext?.Resources.CombatResources),
                     group.Representative.HasHp,
                     group.Representative.HasMaxHp);
                 BossFocuses.Add(row);
@@ -763,8 +768,8 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     group.Representative.InstanceId,
                     group.NpcCode,
                     group.InstanceCount,
-                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp),
-                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.Hp, DisplayContext?.Resources.CombatResources),
+                    BossFocusDisplayBuilder.NormalizeHpForDisplay(group.Representative.Kind, group.NpcCode, group.Representative.MaxHp, DisplayContext?.Resources.CombatResources),
                     group.Representative.HasHp,
                     group.Representative.HasMaxHp);
             }
@@ -1076,6 +1081,60 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _captureService.Scene.Reset(resolveSessionStarted);
     }
 
+    private async Task ChangeClientAsync()
+    {
+        if (_isDisposed || _isChangingClient)
+            return;
+
+        _isChangingClient = true;
+        _suppressRefresh = true;
+        try
+        {
+            while (!_isDisposed && _captureService.Scene.ClientContext.Profile.Version != SettingsFlyout.SelectedClientVersion)
+            {
+                var context = SceneClientContext.Create(ClientProfiles.Get(SettingsFlyout.SelectedClientVersion));
+                await _captureService.SwitchClientAsync(context, ArchiveForClientChange);
+                IsCapturing = _captureService.IsDriverActive;
+                if (_isDisposed)
+                    return;
+                _displayContextVersion++;
+                ResetLivePresentation();
+            }
+        }
+        catch (Exception ex)
+        {
+            IsCapturing = _captureService.IsDriverActive;
+            if (!_isDisposed)
+            {
+                SettingsFlyout.SelectedClientVersion = _captureService.Scene.ClientContext.Profile.Version;
+                _displayContextVersion++;
+                ResetLivePresentation();
+                Status = ex.Message;
+            }
+        }
+        finally
+        {
+            _isChangingClient = false;
+            _suppressRefresh = false;
+            if (!_isDisposed)
+            {
+                ChangeSceneKind();
+                _captureService.Scene.SetCombatantStatisticsScope(SettingsFlyout.CombatantStatisticsScope);
+                RebuildEncounterHistory();
+                RefreshDisplayedSnapshot(forceDetailRefresh: true);
+                RefreshCaptureIndicators();
+            }
+        }
+    }
+
+    private void ArchiveForClientChange()
+    {
+        DrainPendingBossArchives();
+        DrainMapTransitionArchives();
+        var payload = _captureService.Scene.ArchiveAndReset(static () => DateTimeOffset.Now);
+        _encounterArchiveService.Archive(payload, "client-change", isAutomatic: true);
+    }
+
     private void ChangeSceneKind()
     {
         if (_isDisposed || _suppressRefresh || _captureService.Scene.Kind == SettingsFlyout.SceneKind)
@@ -1131,9 +1190,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void ResetLivePresentation()
     {
-        _latestLiveSnapshot = new SceneCombatSnapshot();
-        _displayedSnapshot = new SceneCombatSnapshot();
-        _latestLiveFrame = new SceneReadModelFrame();
+        _latestLiveFrame = _captureService.Scene.CreateFrame();
+        _latestLiveSnapshot = _latestLiveFrame.Snapshot;
+        _displayedSnapshot = _latestLiveSnapshot;
         Combatants.Clear();
         TotalFilteredDamagePerSecond = 0;
         CombatantDetails.Clear();

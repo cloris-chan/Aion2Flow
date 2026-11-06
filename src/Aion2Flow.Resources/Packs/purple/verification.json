@@ -1,0 +1,33 @@
+{
+  "ResourceSetId": "purple",
+  "DefaultLanguage": "en-US",
+  "SkillDefinitions": 16056,
+  "NpcDefinitions": 13030,
+  "RuntimeSemanticRoundTripVerified": true,
+  "Locales": [
+    {
+      "Language": "en-US",
+      "Skills": 16056,
+      "Npcs": 13030,
+      "Maps": 819,
+      "Servers": 750,
+      "Sha256": "6aaf7b8e54ef13f9b85db3eef0964b218b40a004140d9f4d6bf0ebfcb8aedb26"
+    },
+    {
+      "Language": "ko-KR",
+      "Skills": 16056,
+      "Npcs": 13030,
+      "Maps": 819,
+      "Servers": 750,
+      "Sha256": "a190c744d7f359445b55d02759da2f530559c9797c7a138bbe6478d6aace0452"
+    },
+    {
+      "Language": "zh-TW",
+      "Skills": 16056,
+      "Npcs": 13030,
+      "Maps": 819,
+      "Servers": 750,
+      "Sha256": "66e47345041de57b589f803b889a86fff6318f8f97aa83f6459829996e140d27"
+    }
+  ]
+}

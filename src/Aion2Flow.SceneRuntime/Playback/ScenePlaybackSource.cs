@@ -7,6 +7,7 @@ namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
 public interface IScenePlaybackSource : IDisposable
 {
+    SceneClientContext ClientContext { get; }
     Guid EncounterId { get; }
     DateTimeOffset SceneStarted { get; }
     ScenePlaybackSourceKind SourceKind { get; }
@@ -16,6 +17,7 @@ public interface IScenePlaybackSource : IDisposable
 
 public sealed class ArchivedScenePlaybackSource(SceneArchivePayload payload) : IScenePlaybackSource
 {
+    public SceneClientContext ClientContext => payload.ClientContext;
     public Guid EncounterId => payload.Snapshot.EncounterId;
 
     public DateTimeOffset SceneStarted => payload.SceneStarted;
@@ -42,6 +44,8 @@ public sealed class LiveScenePlaybackSource : IScenePlaybackSource
     }
 
     public Guid EncounterId => _state.EncounterId;
+
+    public SceneClientContext ClientContext => _state.ClientContext;
 
     public DateTimeOffset SceneStarted => _state.SceneStarted;
 
@@ -115,6 +119,8 @@ internal sealed class LiveScenePlaybackState
     }
 
     public Guid EncounterId { get; }
+
+    public SceneClientContext ClientContext => _timelineSegment.ClientContext;
 
     public DateTimeOffset SceneStarted { get; }
 

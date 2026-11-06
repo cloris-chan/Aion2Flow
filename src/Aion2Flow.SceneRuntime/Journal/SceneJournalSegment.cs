@@ -59,6 +59,8 @@ public readonly record struct SceneJournalSegment
 
     public ObservedEventJournal? Journal { get; }
 
+    public SceneClientContext ClientContext => Journal?.ClientContext ?? SceneClientContext.Purple;
+
     public long StartObservationOrdinal { get; }
 
     public long EndObservationOrdinalExclusive => _liveBoundary?.EndObservationOrdinalExclusive ?? _endObservationOrdinalExclusive;

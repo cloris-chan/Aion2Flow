@@ -4,7 +4,7 @@ using Cloris.Aion2Flow.SceneRuntime.Stores;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Playback;
 
-internal sealed class ScenePlaybackMaterializedEventIndex
+internal sealed class ScenePlaybackMaterializedEventIndex(CombatResourceRegistry resources)
 {
     private readonly List<ScenePlaybackEventMarker> _markers = [];
     private readonly List<int> _all = [];
@@ -190,7 +190,7 @@ internal sealed class ScenePlaybackMaterializedEventIndex
         Add(in marker);
     }
 
-    private static ScenePlaybackEventMarker CreateEventMarker(
+    private ScenePlaybackEventMarker CreateEventMarker(
         ScenePlaybackEventFactKind factKind,
         long revision,
         in ScenePlaybackTrackMarker trackMarker,
@@ -201,7 +201,7 @@ internal sealed class ScenePlaybackMaterializedEventIndex
         return new ScenePlaybackEventMarker(
             new ScenePlaybackEventId(factKind, revision),
             trackMarker,
-            SkillBaseKey.FromEventKey(trackMarker.EventKey),
+            SkillBaseKey.FromEventKey(trackMarker.EventKey, resources),
             contribution,
             mechanic,
             resource);

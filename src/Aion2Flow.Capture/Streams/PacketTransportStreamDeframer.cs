@@ -4,6 +4,7 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal sealed class PacketTransportStreamDeframer : IDisposable
 {
+    private readonly ClientPacketProtocol _protocol;
     private readonly PacketTailBuffer _raw = new(CaptureBufferLimits.TransportRawBufferSize);
     private readonly PacketTailBuffer _canonical = new(CaptureBufferLimits.StreamTailBufferSize);
     private bool _allowUnalignedDirectRecovery;
@@ -14,8 +15,10 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
 
     public PacketTransportStreamDeframer(
         PacketTransportFraming framing = PacketTransportFraming.Auto,
-        int transportPrefixLength = 0)
+        int transportPrefixLength = 0,
+        ClientPacketProtocol? protocol = null)
     {
+        _protocol = protocol ?? ClientPacketProtocol.Purple;
         ArgumentOutOfRangeException.ThrowIfNegative(transportPrefixLength);
         if ((framing is PacketTransportFraming.Auto or PacketTransportFraming.DirectRecovery) &&
             transportPrefixLength != 0)
@@ -113,7 +116,8 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
 
             var probe = PacketTransportCodec.ProbeLengthPrefixedStream(
                 _raw.Data,
-                PacketTransportCodec.MaximumEnvelopeBodyLength);
+                PacketTransportCodec.MaximumEnvelopeBodyLength,
+                _protocol);
             if (probe.Kind == PacketLengthPrefixedProbeKind.Complete)
             {
                 ActivateLengthPrefixed(probe.CanonicalPrefixLength);
@@ -132,7 +136,7 @@ internal sealed class PacketTransportStreamDeframer : IDisposable
                         _raw.Data,
                         CaptureBufferLimits.StreamTailBufferSize);
                     if (canonical.Kind == PacketCanonicalFrameProbeKind.Complete &&
-                        PacketTransportCodec.HasRecognizedCanonicalFrameStart(_raw.Data, in canonical))
+                        PacketTransportCodec.HasRecognizedCanonicalFrameStart(_raw.Data, in canonical, _protocol))
                     {
                         return PacketTransportDataAvailability.Available;
                     }

@@ -40,9 +40,12 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         this.nextFlushId = nextFlushId;
         this.collectionPolicy = collectionPolicy;
         _mapContext = mapContext;
+        ClientContext = journal.ClientContext;
     }
 
     public ObservedEventJournal Journal => journal;
+
+    public SceneClientContext ClientContext { get; }
 
     public int CurrentTarget
     {

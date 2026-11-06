@@ -112,7 +112,7 @@ internal sealed class SceneCombatSnapshotBuilder
         return ref metrics;
     }
 
-    public SceneCombatSnapshot ToSnapshot(long readModelRevision)
+    public SceneCombatSnapshot ToSnapshot(long readModelRevision, SceneClientContext? clientContext = null)
     {
         if (_combatants.Count == 0 &&
             _bossFocuses.Count == 0 &&
@@ -166,6 +166,7 @@ internal sealed class SceneCombatSnapshotBuilder
             TargetObservation,
             Encounter,
             bossFocuses,
-            bossNpcCodes);
+            bossNpcCodes,
+            clientContext);
     }
 }

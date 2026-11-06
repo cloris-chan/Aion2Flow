@@ -6,6 +6,19 @@ namespace Cloris.Aion2Flow.Capture.Streams;
 
 internal static class PacketIdentityHandler
 {
+    public static bool ParseNearbyPcProfilePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
+    {
+        if (!Packet4536PcMetadataParser.TryParse(packet, out var metadata))
+            return false;
+        context.Sink.AppendNickname(
+            context.CreateObservationSource(0x4536, packet.Length), metadata.EntityId, metadata.Nickname,
+            PacketFactionMapper.ToFaction(metadata.FactionCode),
+            characterClass: PacketCharacterClassMapper.ToCharacterClass(metadata.ClassCode),
+            originServerId: metadata.OriginServerId > 0 ? metadata.OriginServerId : null,
+            legionName: metadata.LegionName);
+        return context.MarkParsed();
+    }
+
     public static bool ParseOwnNicknamePacket(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
         if (!Packet3336NicknameParser.TryParse(packet, out var parsed))

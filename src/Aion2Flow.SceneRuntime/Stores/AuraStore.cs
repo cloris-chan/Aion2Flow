@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
 
@@ -49,8 +50,9 @@ public readonly record struct AuraLifecycleTransition(
     public bool HasState => State.HasIdentity;
 }
 
-public sealed class AuraStore(int capacity = 0)
+public sealed class AuraStore(int capacity = 0, CombatResourceRegistry? resources = null)
 {
+    private readonly CombatResourceRegistry _resources = resources ?? SceneClientContext.Purple.CombatResources;
     private readonly Dictionary<AuraInstanceKey, AuraInstanceState> _instances = capacity > 0 ? new Dictionary<AuraInstanceKey, AuraInstanceState>(capacity) : [];
 
     public int Count => _instances.Count;
@@ -199,7 +201,7 @@ public sealed class AuraStore(int capacity = 0)
             observation.GroupCode,
             durationMilliseconds,
             observation.BuffResourceEffectRef,
-            AuraSemanticEvidenceResolver.Evaluate(observation.BuffResourceEffectRef),
+            AuraSemanticEvidenceResolver.Evaluate(observation.BuffResourceEffectRef, _resources),
             observedAtMilliseconds,
             observedAtMilliseconds,
             ResolveExpiration(observedAtMilliseconds, durationMilliseconds),
@@ -210,10 +212,10 @@ public sealed class AuraStore(int capacity = 0)
         return new AuraLifecycleTransition(AuraLifecycleEventKind.Open, previous, state, RemovedByReplacement: false);
     }
 
-    private static AuraSemanticValue ResolveSemantics(ResourceEffectRef resourceEffectRef, in AuraInstanceState previous) =>
+    private AuraSemanticValue ResolveSemantics(ResourceEffectRef resourceEffectRef, in AuraInstanceState previous) =>
         resourceEffectRef == previous.ResourceEffectRef
             ? previous.Semantics
-            : AuraSemanticEvidenceResolver.Evaluate(resourceEffectRef);
+            : AuraSemanticEvidenceResolver.Evaluate(resourceEffectRef, _resources);
 
     private static long? ResolveExpiration(long observedAtMilliseconds, long durationMilliseconds)
     {

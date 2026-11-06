@@ -10,7 +10,8 @@ public static class CombatContributionResolver
         int targetId,
         in CombatWireObservation observation,
         in CombatOccurrenceResolution occurrence,
-        out CombatContribution contribution)
+        out CombatContribution contribution,
+        CombatResourceRegistry? resources = null)
     {
         var packet = CombatPacketEvidenceResolver.Evaluate(sourceId, targetId, in observation, in occurrence);
         if (packet.Strength == CombatPacketEvidenceStrength.Proven)
@@ -33,7 +34,7 @@ public static class CombatContributionResolver
 
         if (occurrence.Suppression == CombatSuppressionReason.PeriodicPoolSemanticCandidate)
         {
-            var poolSemantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
+            var poolSemantic = CombatSemanticEvidenceResolver.Evaluate(in observation, resources);
             if (CombatSemanticEvidenceResolver.IsAuthoritativePeriodicShield(in poolSemantic))
             {
                 return CreateContribution(
@@ -50,7 +51,7 @@ public static class CombatContributionResolver
             return false;
         }
 
-        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
+        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation, resources);
         if (semantic.HasCandidate &&
             semantic.Match != CombatSemanticMatchKind.None &&
             CombatContributionAdmission.IsCandidateAdmissible(sourceId, targetId, semantic.Candidate!.Value))
@@ -133,9 +134,10 @@ public static class CombatContributionResolver
         int targetId,
         in CombatWireObservation observation,
         in CombatOccurrenceResolution occurrence,
-        out CombatContribution contribution)
+        out CombatContribution contribution,
+        CombatResourceRegistry? resources = null)
     {
-        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation);
+        var semantic = CombatSemanticEvidenceResolver.Evaluate(in observation, resources);
         return TryResolveSemanticOnly(sourceId, targetId, in observation, in occurrence, in semantic, out contribution);
     }
 

@@ -7,11 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Aion2Flow.Clients\Aion2Flow.Clients.csproj" />
     <PackageReference Include="K4os.Compression.LZ4" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Packs\*.bin" />
+    <EmbeddedResource Include="Packs\**\*.bin" />
   </ItemGroup>
 
 </Project>

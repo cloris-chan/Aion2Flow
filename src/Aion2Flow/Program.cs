@@ -96,6 +96,7 @@ internal static class Program
         services.AddSingleton<SettingsService>();
         services.AddSingleton<App>();
         services.AddSingleton<LanguageService>();
+        services.AddSingleton<ClientSettingsService>();
         services.AddSingleton<GameResourceService>();
         services.AddSingleton<LocalizationService>();
         services.AddSingleton<PlayerNameDisplayService>();

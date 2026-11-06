@@ -79,7 +79,7 @@ public sealed class ScenePlaybackAuraTimelinePresentationTests
         var language = new LanguageService();
         language.SetLanguage(LanguageService.English);
         using var localization = new LocalizationService(language);
-        using var resources = new GameResourceService(language);
+        using var resources = new GameResourceService(Cloris.Aion2Flow.Clients.ClientProfiles.Purple, language.CurrentLanguage);
         var displayContext = new SceneDisplayContext(SceneIdentityScope.Empty, null, null, resources, "Unknown");
         return ScenePlaybackTimelineBuilder.BuildAuraTimelineTracks(timeline, 1_000, localization, displayContext);
     }

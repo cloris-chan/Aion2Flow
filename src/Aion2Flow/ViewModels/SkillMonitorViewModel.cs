@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Protocol.Combat;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
 using Cloris.Aion2Flow.SceneRuntime.Model;
@@ -19,7 +20,8 @@ public sealed class SkillMonitorViewModel : ObservableObject
 {
     private const int JournalReadBatchSize = 2_048;
     private readonly WinDivertCaptureService _captureService;
-    private readonly GameResourceService _resources;
+    private readonly GameResourceService _resourceRoot;
+    private GameResourceService _resources;
     private readonly LocalizationService _localization;
     private readonly SettingsService _settings;
     private readonly Predicate<int> _cooldownSelection;
@@ -41,7 +43,8 @@ public sealed class SkillMonitorViewModel : ObservableObject
         SettingsService settings)
     {
         _captureService = captureService;
-        _resources = resources;
+        _resourceRoot = resources;
+        _resources = resources.GetForClient(captureService.Scene.ClientContext);
         _localization = localization;
         _settings = settings;
         _cooldownSelection = IsCooldownMonitored;
@@ -68,17 +71,18 @@ public sealed class SkillMonitorViewModel : ObservableObject
         }
 
         var frame = scene.CopyLocalPlayerAurasTo(_activeAuras);
-        EnsureSession(in frame);
+        EnsureSession(in frame, scene.ClientContext);
         ReadCooldownJournal(scene.Journal, in frame);
         RefreshSkillRows(CollectionsMarshal.AsSpan(_activeAuras), frame.EntityId, frame.ObservedAtMilliseconds);
     }
 
-    private void EnsureSession(in SceneLocalPlayerFrame frame)
+    private void EnsureSession(in SceneLocalPlayerFrame frame, SceneClientContext clientContext)
     {
         if (_sessionId == frame.SessionId)
             return;
 
         _sessionId = frame.SessionId;
+        _resources = _resourceRoot.GetForClient(clientContext);
         _cooldowns.Clear();
         _skillSlotPresentationTracker.Clear();
         _journalCursor = new JournalCursor(frame.StartObservationOrdinal);
@@ -252,7 +256,7 @@ public sealed class SkillMonitorViewModel : ObservableObject
 
         var skillId = packetSkillCode;
         if (!_resources.ContainsSkill(packetSkillCode) &&
-            CombatResourceRegistry.TryResolveSkillIdByEffectRef(
+            _resources.CombatResources.TryResolveSkillIdByEffectRef(
                 ResourceEffectRef.FromRaw(unchecked((uint)packetSkillCode)),
                 out var effectSkillId))
         {
@@ -348,7 +352,7 @@ public sealed class SkillMonitorViewModel : ObservableObject
             return false;
         }
 
-        if (CombatResourceRegistry.TryResolveSkillIdByEffectRef(effectRef, out var ownerSkillId))
+        if (_resources.CombatResources.TryResolveSkillIdByEffectRef(effectRef, out var ownerSkillId))
         {
             normalizedSkillId = _resources.ResolveBaseSkillIdForCode(ownerSkillId);
             if (normalizedSkillId > 0)
@@ -357,7 +361,7 @@ public sealed class SkillMonitorViewModel : ObservableObject
             }
         }
 
-        if (CombatResourceRegistry.TryResolveAuraResourceSemantics(effectRef, out var resolution) &&
+        if (_resources.CombatResources.TryResolveAuraResourceSemantics(effectRef, out var resolution) &&
             resolution.Slot is { SkillId: > 0 } slot)
         {
             normalizedSkillId = _resources.ResolveBaseSkillIdForCode(slot.SkillId);

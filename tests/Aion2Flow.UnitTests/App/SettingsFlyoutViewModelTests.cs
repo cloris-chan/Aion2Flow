@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Presentation;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Settings;
@@ -8,6 +9,38 @@ namespace Cloris.Aion2Flow.Tests.App;
 
 public sealed class SettingsFlyoutViewModelTests
 {
+    [Fact]
+    public void UnsupportedPersistedClientIsRejectedBeforeSessionSelection()
+    {
+        using var settingsFile = new TemporarySettingsFile();
+        var settings = new SettingsService(settingsFile.Path);
+        settings.Update(value => value.ClientVersion = (ClientVersion)int.MaxValue);
+        var restored = new SettingsService(settingsFile.Path);
+        Assert.Equal((ClientVersion)int.MaxValue, restored.Current.ClientVersion);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClientSettingsService(restored, new LanguageService()));
+    }
+
+    [Fact]
+    public void ResourceLanguageAndInterfaceLanguageSettingsAreIndependent()
+    {
+        using var fixture = new SettingsViewModelFixture(settings =>
+        {
+            settings.Language = LanguageService.English;
+            settings.ResourceLanguage = LanguageService.TraditionalChinese;
+        });
+        var viewModel = fixture.ViewModel;
+        Assert.Equal(LanguageService.English, viewModel.SelectedLanguage?.Code);
+        Assert.Equal(LanguageService.TraditionalChinese, viewModel.SelectedResourceLanguage?.Code);
+        viewModel.SelectedLanguage = viewModel.Languages.Single(option => option.Code == LanguageService.Korean);
+        Assert.Equal(LanguageService.TraditionalChinese, viewModel.SelectedResourceLanguage?.Code);
+        viewModel.SelectedResourceLanguage = viewModel.ResourceLanguages.Single(option => option.Code == LanguageService.English);
+        Assert.Equal(LanguageService.Korean, viewModel.SelectedLanguage?.Code);
+
+        var persisted = new SettingsService(fixture.SettingsPath).Current;
+        Assert.Equal(LanguageService.Korean, persisted.Language);
+        Assert.Equal(LanguageService.English, persisted.ResourceLanguage);
+    }
+
     [Fact]
     public void SettingsService_PersistsBothGlobalHotkeys()
     {
@@ -266,6 +299,7 @@ public sealed class SettingsFlyoutViewModelTests
         private readonly PlayerNameDisplayService _playerNameDisplay;
         private readonly UiScaleService _uiScale;
         private readonly ProcessForegroundWatcher _processForegroundWatcher;
+        private readonly ClientSettingsService _clientSettings;
 
         public SettingsViewModelFixture(Action<AppSettings>? configureSettings = null)
         {
@@ -277,6 +311,7 @@ public sealed class SettingsFlyoutViewModelTests
                 settings.Update(configureSettings);
             }
             _playerNameDisplay = new PlayerNameDisplayService(settings, _localization);
+            _clientSettings = new ClientSettingsService(settings, language);
             _uiScale = new UiScaleService(settings);
             _processForegroundWatcher = new ProcessForegroundWatcher();
             HotkeyPlatform = new TestGlobalHotkeyPlatform();
@@ -289,7 +324,8 @@ public sealed class SettingsFlyoutViewModelTests
                 _uiScale,
                 new AppUpdateService(),
                 _processForegroundWatcher,
-                HotkeyService);
+                HotkeyService,
+                _clientSettings);
         }
 
         public string SettingsPath => _settingsFile.Path;
@@ -304,6 +340,7 @@ public sealed class SettingsFlyoutViewModelTests
         {
             HotkeyService.DetachWindow();
             _processForegroundWatcher.Dispose();
+            _clientSettings.Dispose();
             _uiScale.Dispose();
             _playerNameDisplay.Dispose();
             _localization.Dispose();

@@ -7,9 +7,9 @@ internal delegate bool TcpRecoveredStreamSegmentHandler(
     ReadOnlySpan<byte> payload,
     CapturedPacketTimestamp timestamp);
 
-internal sealed class TcpWorldStreamRecoveryBuffer : IDisposable
+internal sealed class TcpWorldStreamRecoveryBuffer(ClientPacketProtocol? protocol = null) : IDisposable
 {
-    private readonly TcpWorldStreamClassifier _classifier = new(allowMidstreamRecovery: true);
+    private readonly TcpWorldStreamClassifier _classifier = new(allowMidstreamRecovery: true, protocol);
     private readonly List<Segment> _segments = [];
     private int _bufferedBytes;
 

@@ -5,34 +5,19 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 
-public static class CombatResourceRegistry
+public sealed class CombatResourceRegistry
 {
-    private static SkillDisplayCatalog _skillMap = [];
-    private static IReadOnlyDictionary<int, SkillBaseProjection> _skillBaseProjections = new Dictionary<int, SkillBaseProjection>();
-    private static IReadOnlyDictionary<uint, int> _effectSkillIds = new Dictionary<uint, int>();
-    private static SkillSemanticRuntimeIndex _skillSemanticIndex = SkillSemanticRuntimeIndex.Empty;
+    private readonly SkillDisplayCatalog _skillMap;
+    private readonly IReadOnlyDictionary<int, SkillBaseProjection> _skillBaseProjections;
+    private readonly IReadOnlyDictionary<uint, int> _effectSkillIds;
+    private readonly SkillSemanticRuntimeIndex _skillSemanticIndex;
 
-    public static SkillDisplayCatalog SkillMap => _skillMap;
+    public SkillDisplayCatalog SkillMap => _skillMap;
 
-    public static SkillDisplayCatalog SkillDisplayMap { get; private set; } = [];
-    public static IReadOnlyDictionary<int, SkillBaseProjection> SkillBaseProjections => _skillBaseProjections;
-    public static long SkillMapRevision { get; private set; }
-    public static IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcDisplayEntry>();
+    public IReadOnlyDictionary<int, SkillBaseProjection> SkillBaseProjections => _skillBaseProjections;
+    public IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; }
 
-    public static void EnsureCombatResources()
-    {
-        if (SkillMap.Count != 0)
-            return;
-
-        SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-    }
-
-    public static void LoadSkillMap(string lang)
-    {
-        SetGameResources(ResourceCatalog.Load(lang));
-    }
-
-    public static void SetGameResources(ResourceCatalogSnapshot snapshot)
+    public CombatResourceRegistry(ResourceCatalogSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
@@ -40,19 +25,10 @@ public static class CombatResourceRegistry
         _skillBaseProjections = snapshot.SkillBaseProjections;
         _effectSkillIds = snapshot.EffectSkillIds;
         _skillSemanticIndex = snapshot.SkillSemanticRuntimeIndex;
-        SkillDisplayMap = snapshot.Skills;
         NpcCatalog = snapshot.NpcCatalog;
-        SkillMapRevision++;
     }
 
-    public static void UpdateDisplayResources(SkillDisplayCatalog skillMap, IReadOnlyDictionary<int, NpcDisplayEntry> npcCatalog)
-    {
-        EnsureCombatResources();
-        SkillDisplayMap = skillMap;
-        NpcCatalog = npcCatalog;
-    }
-
-    public static bool TryResolveNpcCatalogEntry(int npcCode, out NpcDisplayEntry entry)
+    public bool TryResolveNpcCatalogEntry(int npcCode, out NpcDisplayEntry entry)
     {
         if (NpcCatalog.TryGetValue(npcCode, out entry))
             return true;
@@ -61,7 +37,7 @@ public static class CombatResourceRegistry
         return false;
     }
 
-    public static bool TryResolveSkillIdByEffectRef(ResourceEffectRef effectRef, out int skillId)
+    public bool TryResolveSkillIdByEffectRef(ResourceEffectRef effectRef, out int skillId)
     {
         if (effectRef.IsEmpty || !_effectSkillIds.TryGetValue(effectRef.RawId, out skillId))
         {
@@ -72,7 +48,7 @@ public static class CombatResourceRegistry
         return true;
     }
 
-    private static bool TryResolveDirectResourceSemantics(
+    private bool TryResolveDirectResourceSemantics(
         ResourceEffectRef effectRef,
         in CombatWireObservation observation,
         out SkillSemanticResourceResolution resolution)
@@ -87,7 +63,7 @@ public static class CombatResourceRegistry
         return _skillSemanticIndex.TryResolveDirectResourceReference(effectRef.RawId, preferredSkillId, out resolution);
     }
 
-    private static bool TryResolvePeriodicResourceSemantics(
+    private bool TryResolvePeriodicResourceSemantics(
         ResourceEffectRef effectRef,
         in CombatWireObservation observation,
         out SkillSemanticResourceResolution resolution)
@@ -102,10 +78,10 @@ public static class CombatResourceRegistry
         return _skillSemanticIndex.TryResolvePeriodicResourceReference(effectRef.RawId, preferredSkillId, out resolution);
     }
 
-    public static bool TryResolveDirectCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
+    public bool TryResolveDirectCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
         => TryResolveDirectResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
 
-    public static bool TryResolvePeriodicCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
+    public bool TryResolvePeriodicCombatResourceSemantics(in CombatWireObservation observation, out SkillSemanticResourceResolution resolution)
     {
         if (TryResolvePeriodicResourceSemantics(observation.BodyResourceEffectRef, in observation, out resolution))
         {
@@ -115,7 +91,7 @@ public static class CombatResourceRegistry
         return TryResolvePeriodicResourceSemantics(observation.DetailResourceEffectRef, in observation, out resolution);
     }
 
-    public static bool TryResolveAuraResourceSemantics(ResourceEffectRef resourceEffectRef, out SkillSemanticResourceResolution resolution)
+    public bool TryResolveAuraResourceSemantics(ResourceEffectRef resourceEffectRef, out SkillSemanticResourceResolution resolution)
     {
         if (resourceEffectRef.IsEmpty)
         {
@@ -126,7 +102,7 @@ public static class CombatResourceRegistry
         return _skillSemanticIndex.TryResolveAuraResourceReference(resourceEffectRef.RawId, out resolution);
     }
 
-    public static int ResolveBaseSkillIdForCode(int skillCode)
+    public int ResolveBaseSkillIdForCode(int skillCode)
     {
         if (skillCode <= 0)
         {
@@ -138,7 +114,7 @@ public static class CombatResourceRegistry
             : skillCode;
     }
 
-    private static int ResolveSemanticSkillId(in CombatWireObservation observation)
+    private int ResolveSemanticSkillId(in CombatWireObservation observation)
     {
         var skillId = observation.SkillCode > 0
             ? observation.SkillCode
@@ -159,7 +135,7 @@ public static class CombatResourceRegistry
         return _skillSemanticIndex.ContainsSkill(baseSkillId) ? baseSkillId : 0;
     }
 
-    public static bool TryResolveBaseSkillIdForEffectRef(ResourceEffectRef effectRef, out int baseSkillId)
+    public bool TryResolveBaseSkillIdForEffectRef(ResourceEffectRef effectRef, out int baseSkillId)
     {
         if (!TryResolveSkillIdByEffectRef(effectRef, out var skillId))
         {
@@ -171,7 +147,7 @@ public static class CombatResourceRegistry
         return baseSkillId > 0;
     }
 
-    public static bool TryResolveBaseSkillIdForEventKey(CombatEventKey eventKey, out int baseSkillId)
+    public bool TryResolveBaseSkillIdForEventKey(CombatEventKey eventKey, out int baseSkillId)
     {
         if (eventKey.SkillCode > 0)
         {
@@ -197,7 +173,7 @@ public static class CombatResourceRegistry
         return false;
     }
 
-    public static bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out SkillDisplayEntry skillDisplayEntry)
+    public bool TryResolveSkillByEffectRef(ResourceEffectRef effectRef, out SkillDisplayEntry skillDisplayEntry)
     {
         if (!TryResolveSkillIdByEffectRef(effectRef, out var skillId))
         {
@@ -220,13 +196,10 @@ public static class CombatResourceRegistry
         return false;
     }
 
-    public static string DisplaySkillNameFor(int skillCode)
+    public string DisplaySkillNameFor(int skillCode)
     {
         if (skillCode <= 0)
             return string.Empty;
-
-        if (SkillDisplayMap.TryGetValue(skillCode, out var displaySkill) && !string.IsNullOrWhiteSpace(displaySkill.Name))
-            return displaySkill.Name;
 
         if (SkillMap.TryGetValue(skillCode, out var skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
             return skillDisplayEntry.Name;
@@ -241,11 +214,8 @@ public static class CombatResourceRegistry
         return string.Empty;
     }
 
-    private static bool TryResolveSkillDisplayEntry(int skillCode, out SkillDisplayEntry skillDisplayEntry)
+    private bool TryResolveSkillDisplayEntry(int skillCode, out SkillDisplayEntry skillDisplayEntry)
     {
-        if (SkillDisplayMap.TryGetValue(skillCode, out skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
-            return true;
-
         if (SkillMap.TryGetValue(skillCode, out skillDisplayEntry) && !string.IsNullOrWhiteSpace(skillDisplayEntry.Name))
             return true;
 

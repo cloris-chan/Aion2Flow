@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using Avalonia.Threading;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
@@ -14,6 +16,7 @@ namespace Cloris.Aion2Flow.ViewModels;
 public sealed partial class SettingsFlyoutViewModel : ObservableObject
 {
     private readonly LanguageService _languageService;
+    private readonly ClientSettingsService _clientSettings;
     private readonly SettingsService _settingsService;
     private readonly PlayerNameDisplayService _playerNameDisplay;
     private readonly UiScaleService _uiScale;
@@ -24,10 +27,11 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private bool _hasObservedHotkeyRegistrationState;
     private bool _isHotkeyRegistrationWindowAttached;
 
-    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService)
+    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService, ClientSettingsService clientSettings)
     {
         Localization = localization;
         _languageService = languageService;
+        _clientSettings = clientSettings;
         _settingsService = settingsService;
         _playerNameDisplay = playerNameDisplay;
         _uiScale = uiScale;
@@ -86,8 +90,12 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
         RebuildLanguageOptions();
         SelectedLanguage = Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.Ordinal));
+        SelectedClientVersion = _clientSettings.CurrentProfile.Version;
+        RebuildResourceLanguageOptions();
 
         _languageService.LanguageChanged += OnLanguageServiceLanguageChanged;
+        _clientSettings.ClientChanged += OnClientChanged;
+        _clientSettings.ResourceLanguageChanged += OnResourceLanguageChanged;
         _processForegroundWatcher.ForegroundChanged += OnForegroundChanged;
         _updateService.PropertyChanged += OnUpdatePropertyChanged;
         Localization.LanguageChanged += OnLocalizationLanguageChanged;
@@ -96,6 +104,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public LocalizationService Localization { get; }
 
     public ObservableCollection<LanguageOption> Languages { get; } = [];
+    public ObservableCollection<LanguageOption> ResourceLanguages { get; } = [];
+    public IReadOnlyList<ClientVersion> ClientVersionOptions { get; } = ClientProfiles.Supported.Select(static profile => profile.Version).ToArray();
 
     public IReadOnlyList<TopmostMode> TopmostModeOptions { get; } = [TopmostMode.GameForeground, TopmostMode.Always, TopmostMode.Never];
 
@@ -199,6 +209,14 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
     public partial LanguageOption? SelectedLanguage { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ResourceLanguageDisplay))]
+    public partial LanguageOption? SelectedResourceLanguage { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ClientVersionDisplay))]
+    public partial ClientVersion SelectedClientVersion { get; set; } = ClientVersion.Purple;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ResetHotkeyDisplay))]
@@ -305,6 +323,15 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public string PlayerNameSettingsDisplay => ShowPlayerNamesDisplay;
 
     public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
+    public string ResourceLanguageDisplay => SelectedResourceLanguage?.DisplayName ?? string.Empty;
+    public string ClientVersionDisplay => ResolveClientVersionDisplay(SelectedClientVersion);
+
+    public string ResolveClientVersionDisplay(ClientVersion version) => version switch
+    {
+        ClientVersion.Purple => Localization["Settings_ClientVersion_Purple"],
+        ClientVersion.Steam => Localization["Settings_ClientVersion_Steam"],
+        _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported game client version.")
+    };
 
     public bool IsUpdateSectionVisible => _updateService.IsManagedByVelopack;
 
@@ -431,6 +458,14 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             PersistSettings();
         }
     }
+
+    partial void OnSelectedResourceLanguageChanged(LanguageOption? value)
+    {
+        if (value is not null)
+            _clientSettings.SetResourceLanguage(value.Code);
+    }
+
+    partial void OnSelectedClientVersionChanged(ClientVersion value) => _clientSettings.SetClientVersion(value);
 
     public void BeginCaptureHotkey(GlobalHotkeyAction action)
     {
@@ -606,6 +641,18 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         Dispatcher.UIThread.Post(RebuildLanguageOptions);
     }
 
+    private void OnClientChanged(object? sender, ClientProfile profile)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            SelectedClientVersion = _clientSettings.CurrentProfile.Version;
+            RebuildResourceLanguageOptions();
+        });
+    }
+
+    private void OnResourceLanguageChanged(object? sender, string language)
+        => Dispatcher.UIThread.Post(RebuildResourceLanguageOptions);
+
     private void OnLocalizationLanguageChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(TopmostModeDisplay));
@@ -628,6 +675,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(SkillMonitorEnabledDisplay));
         OnPropertyChanged(nameof(PlayerNameSettingsDisplay));
         OnPropertyChanged(nameof(LanguageDisplay));
+        OnPropertyChanged(nameof(ResourceLanguageDisplay));
+        OnPropertyChanged(nameof(ClientVersionDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));
         OnPropertyChanged(nameof(ResetHotkeyDisplay));
@@ -645,6 +694,14 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         Languages.Add(new LanguageOption(LanguageService.English, "English"));
         Languages.Add(new LanguageOption(LanguageService.Korean, "한국어"));
         SelectedLanguage = Languages.FirstOrDefault(x => x.Code == selectedCode) ?? Languages.FirstOrDefault();
+    }
+
+    private void RebuildResourceLanguageOptions()
+    {
+        ResourceLanguages.Clear();
+        foreach (var language in _clientSettings.ResourceLanguages)
+            ResourceLanguages.Add(new LanguageOption(language, CultureInfo.GetCultureInfo(language).NativeName));
+        SelectedResourceLanguage = ResourceLanguages.FirstOrDefault(option => option.Code == _clientSettings.ResourceLanguage);
     }
 
     private void OnUpdatePropertyChanged(object? sender, PropertyChangedEventArgs e)

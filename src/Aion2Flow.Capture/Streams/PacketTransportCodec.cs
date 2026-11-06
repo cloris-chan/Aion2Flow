@@ -107,8 +107,10 @@ internal static class PacketTransportCodec
 
     public static PacketLengthPrefixedProbe ProbeLengthPrefixedStream(
         ReadOnlySpan<byte> payload,
-        int maximumEnvelopeLength)
+        int maximumEnvelopeLength,
+        ClientPacketProtocol? protocol = null)
     {
+        protocol ??= ClientPacketProtocol.Purple;
         if (payload.Length < LengthPrefixedHeaderLength)
         {
             var partialValue = 0u;
@@ -135,7 +137,7 @@ internal static class PacketTransportCodec
         }
 
         var body = payload.Slice(LengthPrefixedHeaderLength, bodyLength);
-        if (IsCompleteRecognizedCanonicalSequence(body, CaptureBufferLimits.StreamTailBufferSize))
+        if (IsCompleteRecognizedCanonicalSequence(body, CaptureBufferLimits.StreamTailBufferSize, protocol))
         {
             return new PacketLengthPrefixedProbe(
                 PacketLengthPrefixedProbeKind.Complete,
@@ -143,14 +145,15 @@ internal static class PacketTransportCodec
                 -1);
         }
 
-        if (!HasRecognizedCanonicalStart(body, CaptureBufferLimits.StreamTailBufferSize))
+        if (!HasRecognizedCanonicalStart(body, CaptureBufferLimits.StreamTailBufferSize, protocol))
         {
-            return ProbeUnalignedLengthPrefixedStream(payload, maximumEnvelopeLength);
+            return ProbeUnalignedLengthPrefixedStream(payload, maximumEnvelopeLength, protocol);
         }
 
         var directTickProbe = ProbeDirectTickAfterEnvelopeBoundary(
             payload,
-            nextHeaderOffset);
+            nextHeaderOffset,
+            protocol);
         if (directTickProbe.Kind == DirectTickProbeKind.Complete)
         {
             return new PacketLengthPrefixedProbe(
@@ -180,7 +183,8 @@ internal static class PacketTransportCodec
 
     public static PacketLengthPrefixedBoundaryProbe ProbeLengthPrefixedStreamBoundary(
         ReadOnlySpan<byte> payload,
-        int maximumEnvelopeLength)
+        int maximumEnvelopeLength,
+        ClientPacketProtocol? protocol = null)
     {
         var pending = PacketLengthPrefixedBoundaryProbe.None;
         var pendingNextHeaderOffset = -1;
@@ -195,7 +199,7 @@ internal static class PacketTransportCodec
                 continue;
             }
 
-            var probe = ProbeLengthPrefixedStream(candidate, maximumEnvelopeLength);
+            var probe = ProbeLengthPrefixedStream(candidate, maximumEnvelopeLength, protocol);
             if (probe.Kind == PacketLengthPrefixedProbeKind.Complete)
             {
                 if (candidateOffset == pendingNextHeaderOffset)
@@ -277,49 +281,11 @@ internal static class PacketTransportCodec
         return false;
     }
 
-    public static bool IsKnownGameplayOpcode(byte opcode0, byte opcode1)
-    {
-        return (opcode0, opcode1) switch
-        {
-            (0x29, 0x33) or
-            (0x00, 0x36) or (0x03, 0x36) or (0x11, 0x36) or (0x15, 0x36) or
-            (0x21, 0x36) or (0x23, 0x36) or (0x33, 0x36) or (0x40, 0x36) or
-            (0x41, 0x36) or (0x45, 0x36) or (0x46, 0x36) or (0x49, 0x36) or
-            (0x4a, 0x36) or (0x4b, 0x36) or
-            (0x1d, 0x37) or
-            (0x02, 0x38) or (0x03, 0x38) or (0x04, 0x38) or (0x05, 0x38) or
-            (0x06, 0x38) or (0x22, 0x38) or (0x2a, 0x38) or (0x2b, 0x38) or (0x2c, 0x38) or
-            (0x35, 0x38) or
-            (0x01, 0x40) or (0x02, 0x40) or
-            (0x84, 0x56) or
-            (0x00, 0x61) or (0x01, 0x61) or
-            (0x00, 0x8d) or (0x04, 0x8d) or (0x21, 0x8d) or
-            (0x00, 0x92) or (0x0d, 0x92) or (0x1b, 0x92) or (0x2e, 0x92) or
-            (0x2f, 0x92) or
-            (0x09, 0x94) or (0x0b, 0x94) or
-            (0x02, 0x96) or (0x0a, 0x96) or (0x1b, 0x96) or (0x1d, 0x96) or
-            (0x1e, 0x96) or (0x2b, 0x96) => true,
-            _ => false
-        };
-    }
-
     public static bool HasRecognizedCanonicalFrameStart(
         ReadOnlySpan<byte> payload,
-        in PacketCanonicalFrameProbe frame)
-    {
-        if (frame.Kind == PacketCanonicalFrameProbeKind.Invalid ||
-            frame.PrefixLength == 0 ||
-            payload.Length < frame.PrefixLength + sizeof(ushort))
-        {
-            return false;
-        }
-
-        var opcode0 = payload[frame.PrefixLength];
-        var opcode1 = payload[frame.PrefixLength + 1];
-        return (opcode0 == 0xff && opcode1 == 0xff) ||
-               opcode1 == 0x39 ||
-               IsKnownGameplayOpcode(opcode0, opcode1);
-    }
+        in PacketCanonicalFrameProbe frame,
+        ClientPacketProtocol protocol)
+        => protocol.HasRecognizedFrameStart(payload, in frame);
 
     private static PacketCanonicalFrameProbe ReadCanonicalLengthPrefix(ReadOnlySpan<byte> payload)
     {
@@ -366,11 +332,12 @@ internal static class PacketTransportCodec
 
     private static bool IsCompleteRecognizedCanonicalSequence(
         ReadOnlySpan<byte> body,
-        int maximumFrameLength)
+        int maximumFrameLength,
+        ClientPacketProtocol protocol)
     {
         var firstFrame = ProbeCanonicalFrame(body, maximumFrameLength);
         if (firstFrame.Kind != PacketCanonicalFrameProbeKind.Complete ||
-            !HasRecognizedCanonicalFrameStart(body, in firstFrame))
+            !HasRecognizedCanonicalFrameStart(body, in firstFrame, protocol))
         {
             return false;
         }
@@ -392,15 +359,17 @@ internal static class PacketTransportCodec
 
     private static bool HasRecognizedCanonicalStart(
         ReadOnlySpan<byte> body,
-        int maximumFrameLength)
+        int maximumFrameLength,
+        ClientPacketProtocol protocol)
     {
         var frame = ProbeCanonicalFrame(body, maximumFrameLength);
-        return HasRecognizedCanonicalFrameStart(body, in frame);
+        return HasRecognizedCanonicalFrameStart(body, in frame, protocol);
     }
 
     private static DirectTickProbe ProbeDirectTickAfterEnvelopeBoundary(
         ReadOnlySpan<byte> payload,
-        int envelopeEndOffset)
+        int envelopeEndOffset,
+        ClientPacketProtocol protocol)
     {
         const int canonicalStartOffset = LengthPrefixedHeaderLength;
         var canonical = payload[canonicalStartOffset..];
@@ -420,7 +389,7 @@ internal static class PacketTransportCodec
             var frameEnd = checked(frameStart + frame.FrameLength);
             var crossesEnvelopeBoundary =
                 frameStart < envelopeEndOffset && envelopeEndOffset < frameEnd;
-            if (!HasRecognizedCanonicalFrameStart(canonical[offset..], in frame))
+            if (!HasRecognizedCanonicalFrameStart(canonical[offset..], in frame, protocol))
             {
                 return DirectTickProbe.None;
             }
@@ -460,7 +429,8 @@ internal static class PacketTransportCodec
 
     private static PacketLengthPrefixedProbe ProbeUnalignedLengthPrefixedStream(
         ReadOnlySpan<byte> payload,
-        int maximumEnvelopeLength)
+        int maximumEnvelopeLength,
+        ClientPacketProtocol protocol)
     {
         const int minimumEnvelopeCount = 3;
         var rawOffset = 0;
@@ -510,7 +480,7 @@ internal static class PacketTransportCodec
                 rawOffset = checked(bodyOffset + bodyLength);
             }
 
-            return TryFindRecognizedCanonicalPair(canonical, out var prefixLength)
+            return TryFindRecognizedCanonicalPair(canonical, protocol, out var prefixLength)
                 ? new PacketLengthPrefixedProbe(
                     PacketLengthPrefixedProbeKind.Complete,
                     prefixLength,
@@ -525,6 +495,7 @@ internal static class PacketTransportCodec
 
     private static bool TryFindRecognizedCanonicalPair(
         ReadOnlySpan<byte> canonical,
+        ClientPacketProtocol protocol,
         out int prefixLength)
     {
         prefixLength = 0;
@@ -534,7 +505,7 @@ internal static class PacketTransportCodec
                 canonical[offset..],
                 CaptureBufferLimits.StreamTailBufferSize);
             if (first.Kind != PacketCanonicalFrameProbeKind.Complete ||
-                !HasRecognizedCanonicalFrameStart(canonical[offset..], in first))
+                !HasRecognizedCanonicalFrameStart(canonical[offset..], in first, protocol))
             {
                 continue;
             }
@@ -549,7 +520,7 @@ internal static class PacketTransportCodec
                 canonical[secondOffset..],
                 CaptureBufferLimits.StreamTailBufferSize);
             if (second.Kind != PacketCanonicalFrameProbeKind.Complete ||
-                !HasRecognizedCanonicalFrameStart(canonical[secondOffset..], in second))
+                !HasRecognizedCanonicalFrameStart(canonical[secondOffset..], in second, protocol))
             {
                 continue;
             }

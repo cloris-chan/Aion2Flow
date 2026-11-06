@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Aion2Flow.Clients\Aion2Flow.Clients.csproj" />
     <ProjectReference Include="..\Aion2Flow.Protocol\Aion2Flow.Protocol.csproj" />
     <ProjectReference Include="..\Aion2Flow.Resources\Aion2Flow.Resources.csproj" />
   </ItemGroup>

@@ -12,13 +12,15 @@ public enum CombatContributionPath : byte
 public sealed class CombatContributionPathResolver
 {
     private readonly HashSet<PeriodicPoolKey> _materializedSemanticPoolGrants = [];
+    private readonly CombatResourceRegistry _resources;
 
-    public CombatContributionPathResolver(CombatContributionPath path)
+    public CombatContributionPathResolver(CombatContributionPath path, CombatResourceRegistry? resources = null)
     {
         if (!Enum.IsDefined(path))
             throw new ArgumentOutOfRangeException(nameof(path), path, "Combat contribution path is invalid.");
 
         Path = path;
+        _resources = resources ?? SceneClientContext.Purple.CombatResources;
     }
 
     public CombatContributionPath Path { get; }
@@ -48,7 +50,7 @@ public sealed class CombatContributionPathResolver
 
         var resolved = Path switch
         {
-            CombatContributionPath.ProductionFallback => CombatContributionResolver.TryResolve(sourceId, targetId, in observation, in occurrence, out contribution),
+            CombatContributionPath.ProductionFallback => CombatContributionResolver.TryResolve(sourceId, targetId, in observation, in occurrence, out contribution, _resources),
             CombatContributionPath.PacketOnly => CombatContributionResolver.TryResolvePacketOnly(sourceId, targetId, in observation, in occurrence, in packet, out contribution),
             CombatContributionPath.SemanticOnly => CombatContributionResolver.TryResolveSemanticOnly(sourceId, targetId, in observation, in occurrence, in semantic, out contribution),
             _ => throw new InvalidOperationException($"Unsupported combat contribution path: {Path}.")
@@ -75,9 +77,9 @@ public sealed class CombatContributionPathResolver
         suppressedOccurrence = false;
         var resolved = Path switch
         {
-            CombatContributionPath.ProductionFallback => CombatContributionResolver.TryResolve(sourceId, targetId, in observation, in occurrence, out contribution),
+            CombatContributionPath.ProductionFallback => CombatContributionResolver.TryResolve(sourceId, targetId, in observation, in occurrence, out contribution, _resources),
             CombatContributionPath.PacketOnly => CombatContributionResolver.TryResolvePacketOnly(sourceId, targetId, in observation, in occurrence, out contribution),
-            CombatContributionPath.SemanticOnly => CombatContributionResolver.TryResolveSemanticOnly(sourceId, targetId, in observation, in occurrence, out contribution),
+            CombatContributionPath.SemanticOnly => CombatContributionResolver.TryResolveSemanticOnly(sourceId, targetId, in observation, in occurrence, out contribution, _resources),
             _ => throw new InvalidOperationException($"Unsupported combat contribution path: {Path}.")
         };
 

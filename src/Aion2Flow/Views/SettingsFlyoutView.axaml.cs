@@ -1,11 +1,11 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.Services;
@@ -41,6 +41,8 @@ public partial class SettingsFlyoutView : UserControl
     private MenuItem? _skillMonitorEnableMenuItem;
     private MenuItem? _skillMonitorSettingsMenuItem;
     private MenuItem? _languageMenuItem;
+    private MenuItem? _clientVersionMenuItem;
+    private MenuItem? _resourceLanguageMenuItem;
     private SettingsFlyoutViewModel? _viewModel;
     private Services.LocalizationService? _localization;
     private Flyout? _skillMonitorSettingsFlyout;
@@ -83,6 +85,7 @@ public partial class SettingsFlyoutView : UserControl
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             _viewModel.Languages.CollectionChanged -= OnLanguagesCollectionChanged;
+            _viewModel.ResourceLanguages.CollectionChanged -= OnResourceLanguagesCollectionChanged;
         }
         _localization?.LanguageChanged -= OnLocalizationLanguageChanged;
 
@@ -93,6 +96,7 @@ public partial class SettingsFlyoutView : UserControl
         {
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
             _viewModel.Languages.CollectionChanged += OnLanguagesCollectionChanged;
+            _viewModel.ResourceLanguages.CollectionChanged += OnResourceLanguagesCollectionChanged;
         }
         _localization?.LanguageChanged += OnLocalizationLanguageChanged;
 
@@ -109,6 +113,8 @@ public partial class SettingsFlyoutView : UserControl
         RebuildPlayerNameSettingsMenuItems();
         RebuildSkillMonitorMenuItems();
         RebuildLanguageMenuItems();
+        RebuildClientVersionMenuItems();
+        RebuildResourceLanguageMenuItems();
     }
 
     private void OnLocalizationLanguageChanged(object? sender, EventArgs e)
@@ -126,6 +132,8 @@ public partial class SettingsFlyoutView : UserControl
         RebuildPlayerNameSettingsMenuItems();
         RebuildSkillMonitorMenuItems();
         RebuildLanguageMenuItems();
+        RebuildClientVersionMenuItems();
+        RebuildResourceLanguageMenuItems();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -205,6 +213,14 @@ public partial class SettingsFlyoutView : UserControl
                 RefreshLanguageHeader();
                 RefreshLanguageCheckmarks();
                 break;
+            case nameof(SettingsFlyoutViewModel.SelectedClientVersion):
+            case nameof(SettingsFlyoutViewModel.ClientVersionDisplay):
+                RebuildClientVersionMenuItems();
+                break;
+            case nameof(SettingsFlyoutViewModel.SelectedResourceLanguage):
+            case nameof(SettingsFlyoutViewModel.ResourceLanguageDisplay):
+                RebuildResourceLanguageMenuItems();
+                break;
         }
     }
 
@@ -222,7 +238,11 @@ public partial class SettingsFlyoutView : UserControl
         RefreshHideHeaderWhenClickThroughMenuItem();
         RebuildPlayerNameSettingsMenuItems();
         RebuildSkillMonitorMenuItems();
+        RebuildClientVersionMenuItems();
+        RebuildResourceLanguageMenuItems();
     }
+
+    private void OnResourceLanguagesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RebuildResourceLanguageMenuItems();
 
     private void TopmostMenuItemLoaded(object? sender, RoutedEventArgs e)
     {
@@ -248,6 +268,24 @@ public partial class SettingsFlyoutView : UserControl
         {
             _languageMenuItem = mi;
             RebuildLanguageMenuItems();
+        }
+    }
+
+    private void ClientVersionMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && _clientVersionMenuItem != item)
+        {
+            _clientVersionMenuItem = item;
+            RebuildClientVersionMenuItems();
+        }
+    }
+
+    private void ResourceLanguageMenuItemLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item && _resourceLanguageMenuItem != item)
+        {
+            _resourceLanguageMenuItem = item;
+            RebuildResourceLanguageMenuItems();
         }
     }
 
@@ -586,8 +624,7 @@ public partial class SettingsFlyoutView : UserControl
             vm.Localization["Settings_SkillMonitor_Enable"],
             vm.SkillMonitorEnabledDisplay,
             vm.SkillMonitorEnabled);
-        if (_skillMonitorSettingsMenuItem is not null)
-            _skillMonitorSettingsMenuItem.Header = vm.Localization["Settings_SkillMonitor_Configure"];
+        _skillMonitorSettingsMenuItem?.Header = vm.Localization["Settings_SkillMonitor_Configure"];
     }
 
     private void RefreshSkillMonitorHeader()
@@ -720,6 +757,38 @@ public partial class SettingsFlyoutView : UserControl
         }
 
         RefreshTaggedMenuCheckmarks<string>(_languageMenuItem, code => string.Equals(code, vm.SelectedLanguage?.Code, StringComparison.Ordinal));
+    }
+
+    private void RebuildClientVersionMenuItems()
+    {
+        if (ViewModel is not { } viewModel || _clientVersionMenuItem is null)
+            return;
+        _clientVersionMenuItem.Header = CreateRowHeader(viewModel.Localization["Settings_ClientVersion"], viewModel.ClientVersionDisplay);
+        RebuildTaggedMenuItems(_clientVersionMenuItem, viewModel.ClientVersionOptions,
+            viewModel.ResolveClientVersionDisplay, static version => version,
+            version => version == viewModel.SelectedClientVersion, ClientVersionItemClicked);
+    }
+
+    private void RebuildResourceLanguageMenuItems()
+    {
+        if (ViewModel is not { } viewModel || _resourceLanguageMenuItem is null)
+            return;
+        _resourceLanguageMenuItem.Header = CreateRowHeader(viewModel.Localization["Settings_ResourceLanguage"], viewModel.ResourceLanguageDisplay);
+        RebuildTaggedMenuItems(_resourceLanguageMenuItem, viewModel.ResourceLanguages,
+            static option => option.DisplayName, static option => option.Code,
+            option => option.Code == viewModel.SelectedResourceLanguage?.Code, ResourceLanguageItemClicked);
+    }
+
+    private void ClientVersionItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } viewModel && sender is MenuItem { Tag: ClientVersion version })
+            viewModel.SelectedClientVersion = version;
+    }
+
+    private void ResourceLanguageItemClicked(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is { } viewModel && sender is MenuItem { Tag: string language })
+            viewModel.SelectedResourceLanguage = viewModel.ResourceLanguages.FirstOrDefault(option => option.Code == language);
     }
 
     private void TopmostModeItemClicked(object? sender, RoutedEventArgs e)

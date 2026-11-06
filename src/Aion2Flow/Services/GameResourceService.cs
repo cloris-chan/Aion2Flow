@@ -1,37 +1,92 @@
 using System.Collections.Frozen;
 using System.Globalization;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Resources.Catalog;
-using Cloris.Aion2Flow.Resources.Generated;
+using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Combat;
 
 namespace Cloris.Aion2Flow.Services;
 
 public sealed class GameResourceService : IDisposable
 {
-    private readonly LanguageService _languageService;
+    private readonly ClientSettingsService? _clientSettings;
+    private readonly bool _isPinned;
     private readonly Lock _lock = new();
+    private readonly Dictionary<(ClientProfile Profile, ResourceCatalogSnapshot Resources), GameResourceService> _contextResources = [];
     private ResourceCatalogSnapshot _catalog = null!;
     private FrozenSet<int> _playerProfessionBaseSkillIds = Array.Empty<int>().ToFrozenSet();
 
     public event EventHandler<string>? ResourcesChanged;
 
-    public string CurrentLanguage { get; private set; }
+    public string CurrentLanguage { get; private set; } = string.Empty;
+    public SceneClientContext ClientContext { get; private set; }
+    public ClientProfile Profile => ClientContext.Profile;
+    public CombatResourceRegistry CombatResources => ClientContext.CombatResources;
+    public ResourceCatalogSnapshot Catalog => _catalog;
     public SkillDisplayCatalog Skills { get; private set; } = [];
     public IReadOnlyDictionary<int, NpcDisplayEntry> NpcCatalog { get; private set; } = new Dictionary<int, NpcDisplayEntry>();
     public IReadOnlyDictionary<uint, string> Maps { get; private set; } = new Dictionary<uint, string>();
     public IReadOnlyDictionary<int, ServerNameEntry> ServerNames { get; private set; } = new Dictionary<int, ServerNameEntry>();
 
-    public GameResourceService(LanguageService languageService)
+    public GameResourceService(ClientSettingsService clientSettings)
     {
-        _languageService = languageService;
-        _languageService.LanguageChanged += OnLanguageChanged;
-        CurrentLanguage = _languageService.CurrentLanguage;
-        Reload(CurrentLanguage);
+        _clientSettings = clientSettings;
+        ClientContext = new SceneClientContext(clientSettings.CurrentProfile, ResourceCatalog.Load(clientSettings.CurrentProfile));
+        Reload(clientSettings.ResourceLanguage);
+        _clientSettings.ClientChanged += OnClientChanged;
+        _clientSettings.ResourceLanguageChanged += OnResourceLanguageChanged;
+    }
+
+    public GameResourceService(ClientProfile profile, string? language = null)
+        : this(new SceneClientContext(profile, ResourceCatalog.Load(profile)), language)
+    {
+    }
+
+    public GameResourceService(SceneClientContext clientContext, string? language = null)
+    {
+        _isPinned = true;
+        ClientContext = clientContext;
+        Reload(language);
+    }
+
+    public GameResourceService GetForClient(SceneClientContext clientContext)
+    {
+        ArgumentNullException.ThrowIfNull(clientContext);
+        if (_isPinned && Profile == clientContext.Profile &&
+            ReferenceEquals(ClientContext.Resources, clientContext.Resources))
+            return this;
+        var key = (clientContext.Profile, clientContext.Resources);
+        lock (_lock)
+        {
+            if (_contextResources.TryGetValue(key, out var resources))
+                return resources;
+            resources = new GameResourceService(clientContext, CurrentLanguage);
+            _contextResources.Add(key, resources);
+            return resources;
+        }
+    }
+
+    public bool SetResourceLanguage(string language)
+    {
+        if (_clientSettings is not null)
+            return _clientSettings.SetResourceLanguage(language);
+        var resolvedLanguage = ResourceCatalog.GetResourceSet(Profile).ResolveLanguage(language);
+        if (string.Equals(CurrentLanguage, resolvedLanguage, StringComparison.Ordinal))
+            return false;
+        ReloadWithContexts(resolvedLanguage);
+        return true;
     }
 
     public void Dispose()
     {
-        _languageService.LanguageChanged -= OnLanguageChanged;
+        if (_clientSettings is not null)
+        {
+            _clientSettings.ClientChanged -= OnClientChanged;
+            _clientSettings.ResourceLanguageChanged -= OnResourceLanguageChanged;
+        }
+        foreach (var resources in _contextResources.Values)
+            resources.Dispose();
+        _contextResources.Clear();
     }
 
     public string ResolveSkillName(int skillCode)
@@ -121,17 +176,15 @@ public sealed class GameResourceService : IDisposable
 
     public string? ResolveSkillIconAssetName(int skillCode)
     {
-        var assetName = SkillIconCatalog.ResolveAssetName(skillCode);
-        if (assetName is not null || skillCode <= 0)
-        {
-            return assetName;
-        }
-
         ResourceCatalogSnapshot snapshot;
         lock (_lock)
         {
             snapshot = _catalog;
         }
+
+        var assetName = snapshot.ResolveSkillIconAssetName(skillCode);
+        if (assetName is not null || skillCode <= 0)
+            return assetName;
 
         if (TryResolveSkillIdByEffectRef(snapshot, unchecked((uint)skillCode), out var ownerSkillId))
         {
@@ -142,7 +195,7 @@ public sealed class GameResourceService : IDisposable
         var baseSkillId = ResolveBaseSkillIdForCode(snapshot, skillCode);
         if (baseSkillId != skillCode)
         {
-            assetName = SkillIconCatalog.ResolveAssetName(baseSkillId);
+            assetName = snapshot.ResolveSkillIconAssetName(baseSkillId);
             if (assetName is not null)
             {
                 return assetName;
@@ -165,7 +218,7 @@ public sealed class GameResourceService : IDisposable
 
     private static bool TryResolveSkillIconAssetNameBySkillOrBase(ResourceCatalogSnapshot snapshot, int skillCode, out string? assetName)
     {
-        assetName = SkillIconCatalog.ResolveAssetName(skillCode);
+        assetName = snapshot.ResolveSkillIconAssetName(skillCode);
         if (assetName is not null)
         {
             return true;
@@ -177,7 +230,7 @@ public sealed class GameResourceService : IDisposable
             return false;
         }
 
-        assetName = SkillIconCatalog.ResolveAssetName(baseSkillId);
+        assetName = snapshot.ResolveSkillIconAssetName(baseSkillId);
         return assetName is not null;
     }
 
@@ -302,14 +355,32 @@ public sealed class GameResourceService : IDisposable
         return snapshot.ResolveShortServerName(code);
     }
 
-    private void OnLanguageChanged(object? sender, string language)
+    private void OnResourceLanguageChanged(object? sender, string language)
     {
-        Reload(language);
+        if (string.Equals(CurrentLanguage, language, StringComparison.Ordinal))
+            return;
+        ReloadWithContexts(language);
     }
 
-    private void Reload(string language)
+    private void OnClientChanged(object? sender, ClientProfile profile)
     {
-        var catalog = ResourceCatalog.Load(language);
+        ClientContext = SceneClientContext.Create(profile);
+        ReloadWithContexts(ClientContext.Resources.ResourceSet.ResolveLanguage(CurrentLanguage));
+    }
+
+    private void ReloadWithContexts(string language)
+    {
+        Reload(language);
+        lock (_lock)
+        {
+            foreach (var resources in _contextResources.Values)
+                resources.ReloadWithContexts(language);
+        }
+    }
+
+    private void Reload(string? language)
+    {
+        var catalog = ResourceCatalog.Localize(ClientContext.Resources, language);
         var playerProfessionBaseSkillIds = catalog.Skills
             .Where(PlayerProfessionSkillFilter.Includes)
             .Select(skill => ResolveBaseSkillIdForCode(catalog, skill.SkillId))
@@ -318,7 +389,7 @@ public sealed class GameResourceService : IDisposable
 
         lock (_lock)
         {
-            CurrentLanguage = language;
+            CurrentLanguage = catalog.Language;
             _catalog = catalog;
             _playerProfessionBaseSkillIds = playerProfessionBaseSkillIds;
             Skills = catalog.Skills;
@@ -327,7 +398,6 @@ public sealed class GameResourceService : IDisposable
             ServerNames = catalog.ServerNames;
         }
 
-        CombatResourceRegistry.UpdateDisplayResources(catalog.Skills, catalog.NpcCatalog);
-        ResourcesChanged?.Invoke(this, language);
+        ResourcesChanged?.Invoke(this, catalog.Language);
     }
 }

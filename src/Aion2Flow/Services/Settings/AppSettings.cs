@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Model;
 using Cloris.Aion2Flow.ViewModels;
@@ -66,6 +67,10 @@ public sealed class AppSettings
     public int UiScalePercent { get; set => field = Math.Clamp(value, 50, 200); } = 100;
 
     public string? Language { get; set; }
+
+    public ClientVersion ClientVersion { get; set; } = ClientVersion.Purple;
+
+    public string? ResourceLanguage { get; set; }
 
     public uint? BattleResetHotkeyModifiers { get; set; }
 

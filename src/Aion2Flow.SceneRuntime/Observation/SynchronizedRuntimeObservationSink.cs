@@ -13,6 +13,8 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
 {
     public Lock Gate => gate;
 
+    public SceneClientContext ClientContext => inner.ClientContext;
+
     public int CurrentTarget
     {
         get

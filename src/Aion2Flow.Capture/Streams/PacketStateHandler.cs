@@ -1,6 +1,7 @@
 using System.Buffers;
 using Cloris.Aion2Flow.Protocol.Packets;
 using Cloris.Aion2Flow.SceneRuntime.Observation;
+using Cloris.Aion2Flow.SceneRuntime.Runtime;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
@@ -164,15 +165,12 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0140, packet.Length);
-        if (!context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        if (!SceneMapIdClassifier.IsKnownMapId(parsed.Value0, context.Sink.ClientContext))
         {
             return false;
         }
 
-        if (mapScopeStarted)
-        {
-            context.ResetPlayerGroupStatus();
-        }
+        PacketMapHandler.Apply(new(PacketMapEventKind.Candidate, parsed.Value0), 0x0140, packet.Length, ref context);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -195,15 +193,12 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x2136, packet.Length);
-        if (!context.Writer.StageMapCandidateFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        if (!SceneMapIdClassifier.IsKnownMapId(parsed.Value0, context.Sink.ClientContext))
         {
             return false;
         }
 
-        if (mapScopeStarted)
-        {
-            context.ResetPlayerGroupStatus();
-        }
+        PacketMapHandler.Apply(new(PacketMapEventKind.Candidate, parsed.Value0), 0x2136, packet.Length, ref context);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -225,12 +220,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        if (context.Sink.ConfirmDestinationMapArrival(context.CreateObservationSource(0x2336, packet.Length)))
-        {
-            context.ResetPlayerGroupStatus();
-        }
-
-        return context.MarkParsed();
+        return PacketMapHandler.Apply(new(PacketMapEventKind.Arrival, 0), 0x2336, packet.Length, ref context);
     }
 
     public static bool ParseMap2E92Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
@@ -240,11 +230,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.RegisterMapEvent(
-            context.CreateObservationSource(0x2E92, packet.Length),
-            parsed.InstanceId);
-
-        return context.MarkParsed();
+        return PacketMapHandler.Apply(new(PacketMapEventKind.InstanceRegistered, parsed.InstanceId), 0x2E92, packet.Length, ref context);
     }
 
     public static bool ParseMap2F92Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
@@ -254,11 +240,7 @@ internal sealed class PacketStateHandler
             return false;
         }
 
-        context.Sink.UnregisterMapEvent(
-            context.CreateObservationSource(0x2F92, packet.Length),
-            instanceId);
-
-        return context.MarkParsed();
+        return PacketMapHandler.Apply(new(PacketMapEventKind.InstanceUnregistered, instanceId), 0x2F92, packet.Length, ref context);
     }
 
     public static bool ParseState0240Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
@@ -269,15 +251,12 @@ internal sealed class PacketStateHandler
         }
 
         var source = context.CreateObservationSource(0x0240, packet.Length);
-        if (!context.Writer.ApplyCurrentMapFromCompositeSceneState(in source, parsed.Value0, out var mapScopeStarted))
+        if (!SceneMapIdClassifier.IsKnownMapId(parsed.Value0, context.Sink.ClientContext))
         {
             return false;
         }
 
-        if (mapScopeStarted)
-        {
-            context.ResetPlayerGroupStatus();
-        }
+        PacketMapHandler.Apply(new(PacketMapEventKind.Candidate, parsed.Value0), 0x0240, packet.Length, ref context);
 
         var targetId = context.Sink.ResolveNpcObservationSource();
         if (targetId > 0)
@@ -307,18 +286,8 @@ internal sealed class PacketStateHandler
 
     public static bool ParseState4536Packet(ReadOnlySpan<byte> packet, ref PacketParseContext context)
     {
-        if (Packet4536PcMetadataParser.TryParse(packet, out var pcMetadata))
-        {
-            context.Sink.AppendNickname(
-                context.CreateObservationSource(0x4536, packet.Length),
-                pcMetadata.EntityId,
-                pcMetadata.Nickname,
-                PacketFactionMapper.ToFaction(pcMetadata.FactionCode),
-                characterClass: PacketCharacterClassMapper.ToCharacterClass(pcMetadata.ClassCode),
-                originServerId: pcMetadata.OriginServerId > 0 ? pcMetadata.OriginServerId : null,
-                legionName: pcMetadata.LegionName);
-            return context.MarkParsed();
-        }
+        if (PacketIdentityHandler.ParseNearbyPcProfilePacket(packet, ref context))
+            return true;
 
         if (!Packet4536Parser.TryParse(packet, out var parsed))
         {

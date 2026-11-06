@@ -96,12 +96,14 @@ public struct CombatantClassEvidence
         in CombatWireObservation observation,
         in CombatContribution contribution,
         out CharacterClass characterClass,
-        out int score)
+        out int score,
+        CombatResourceRegistry? resources = null)
     {
         characterClass = default;
         score = 0;
 
-        if (!CombatResourceRegistry.SkillMap.TryGetValue(observation.SkillCode, out var skill))
+        resources ??= SceneClientContext.Purple.CombatResources;
+        if (!resources.SkillMap.TryGetValue(observation.SkillCode, out var skill))
             return false;
 
         var mappedClass = MapSkillCategoryToClass(skill.Category);

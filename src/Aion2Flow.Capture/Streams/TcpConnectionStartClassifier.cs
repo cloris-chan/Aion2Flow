@@ -2,8 +2,9 @@ using System.Buffers;
 
 namespace Cloris.Aion2Flow.Capture.Streams;
 
-internal sealed class TcpConnectionStartClassifier : IDisposable
+internal sealed class TcpConnectionStartClassifier(ClientPacketProtocol? protocol = null) : IDisposable
 {
+    private readonly ClientPacketProtocol _protocol = protocol ?? ClientPacketProtocol.Purple;
     private readonly PacketTailBuffer _pending = new(CaptureBufferLimits.TransportRawBufferSize);
     private int _transportPrefixLength;
     private PacketTransportFraming _framing;
@@ -27,7 +28,8 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
         {
             var initialLengthPrefixed = PacketTransportCodec.ProbeLengthPrefixedStream(
                 payload,
-                PacketTransportCodec.MaximumEnvelopeBodyLength);
+                PacketTransportCodec.MaximumEnvelopeBodyLength,
+                _protocol);
             if (initialLengthPrefixed.Kind == PacketLengthPrefixedProbeKind.Complete)
             {
                 return AcceptCurrent(
@@ -51,7 +53,7 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
                 payload,
                 CaptureBufferLimits.StreamTailBufferSize);
             if (canonical.Kind == PacketCanonicalFrameProbeKind.Complete &&
-                PacketTransportCodec.HasRecognizedCanonicalFrameStart(payload, in canonical))
+                PacketTransportCodec.HasRecognizedCanonicalFrameStart(payload, in canonical, _protocol))
             {
                 return AcceptCurrent(PacketTransportFraming.DirectAligned, 0);
             }
@@ -86,7 +88,8 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
         var pending = _pending.Data;
         var lengthPrefixed = PacketTransportCodec.ProbeLengthPrefixedStream(
             pending,
-            PacketTransportCodec.MaximumEnvelopeBodyLength);
+            PacketTransportCodec.MaximumEnvelopeBodyLength,
+            _protocol);
         if (lengthPrefixed.Kind == PacketLengthPrefixedProbeKind.Complete)
         {
             return AcceptPending(
@@ -112,7 +115,7 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
                 pending,
                 CaptureBufferLimits.StreamTailBufferSize);
             if (canonical.Kind == PacketCanonicalFrameProbeKind.Complete &&
-                PacketTransportCodec.HasRecognizedCanonicalFrameStart(pending, in canonical))
+                PacketTransportCodec.HasRecognizedCanonicalFrameStart(pending, in canonical, _protocol))
             {
                 return AcceptPending(PacketTransportFraming.DirectAligned, 0);
             }
@@ -155,7 +158,7 @@ internal sealed class TcpConnectionStartClassifier : IDisposable
         var tickOffset = probe.DirectRecoveryTickOffset;
         if (tickOffset >= 0 &&
             tickOffset <= payload.Length - 11 &&
-            TcpWorldStreamClassifier.IsConfirmed0036(
+            _protocol.IsConfirmedServerTick(
                 payload.Slice(tickOffset, 11),
                 completionCaptureMilliseconds))
         {

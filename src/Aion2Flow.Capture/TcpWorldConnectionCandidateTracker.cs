@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Capture.Streams;
 
 namespace Cloris.Aion2Flow.Capture;
@@ -66,8 +67,9 @@ internal sealed class CaptureConnectionPromotion(
     }
 }
 
-internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
+internal sealed class TcpWorldConnectionCandidateTracker(ClientProfile? clientProfile = null) : IDisposable
 {
+    private readonly ClientPacketProtocol _protocol = ClientPacketProtocol.Resolve(clientProfile ?? ClientProfiles.Purple);
     private readonly Dictionary<TcpConnection, CandidateState> _candidates = [];
     private int _bufferedBytes;
 
@@ -153,7 +155,8 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
                 allowMidstreamRecovery,
                 initialSequenceNumber,
                 connectionOrdinal,
-                priority);
+                priority,
+                _protocol);
             _candidates.Add(connection, candidate);
         }
         else
@@ -345,6 +348,7 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
     {
         private TcpStreamReassembler _reassembler = new();
         private TcpWorldStreamClassifier _classifier;
+        private readonly ClientPacketProtocol _protocol;
         private List<CapturedPacket>? _packets = [];
         private bool _allowMidstreamRecovery;
         private bool _isUsingInitialSequenceAnchor;
@@ -363,14 +367,16 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
             bool allowMidstreamRecovery,
             uint? initialSequenceNumber,
             long ordinal,
-            CandidateConnectionPriority priority)
+            CandidateConnectionPriority priority,
+            ClientPacketProtocol protocol)
         {
+            _protocol = protocol;
             FirstObservedTimestamp = firstObservedTimestamp;
             Ordinal = ordinal;
             Priority = priority;
             _isUsingInitialSequenceAnchor = initialSequenceNumber.HasValue;
             _allowMidstreamRecovery = allowMidstreamRecovery || !_isUsingInitialSequenceAnchor;
-            _classifier = new TcpWorldStreamClassifier(_allowMidstreamRecovery);
+            _classifier = new TcpWorldStreamClassifier(_allowMidstreamRecovery, _protocol);
             if (initialSequenceNumber is { } sequenceNumber)
             {
                 _reassembler.StartAt(sequenceNumber);
@@ -497,7 +503,7 @@ internal sealed class TcpWorldConnectionCandidateTracker : IDisposable
         {
             _classifier.Dispose();
             _reassembler.Dispose();
-            _classifier = new TcpWorldStreamClassifier(_allowMidstreamRecovery);
+            _classifier = new TcpWorldStreamClassifier(_allowMidstreamRecovery, _protocol);
             _reassembler = new TcpStreamReassembler();
             _reassembler.StartAt(sequenceNumber);
             _hasReassembledBaseSequence = false;

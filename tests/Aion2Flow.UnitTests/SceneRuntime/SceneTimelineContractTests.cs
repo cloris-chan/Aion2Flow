@@ -1,4 +1,5 @@
 using Cloris.Aion2Flow.Resources.Catalog;
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.SceneRuntime.Identity;
 using Cloris.Aion2Flow.SceneRuntime.Journal;
@@ -16,7 +17,7 @@ public class SceneTimelineContractTests
     public void SceneMapIdClassifier_AcceptsEveryCurrentClientMap()
     {
         foreach (var mapId in ResourceCatalog.Load(ResourceLanguage.English).Maps.Keys)
-            Assert.True(SceneMapIdClassifier.IsKnownMapId(mapId), $"missing map id {mapId}");
+            Assert.True(SceneMapIdClassifier.IsKnownMapId(mapId, SceneClientContext.Purple), $"missing map id {mapId}");
     }
 
     [Theory]
@@ -26,7 +27,7 @@ public class SceneTimelineContractTests
     [InlineData(123_456u)]
     [InlineData(999_999u)]
     public void SceneMapIdClassifier_RejectsValuesAbsentFromCurrentClientMapResources(uint value)
-        => Assert.False(SceneMapIdClassifier.IsKnownMapId(value));
+        => Assert.False(SceneMapIdClassifier.IsKnownMapId(value, SceneClientContext.Purple));
 
     [Fact]
     public void Journal_CombatEntry_ExposesOnlyTypedCombatPayload()
@@ -916,10 +917,12 @@ public class SceneTimelineContractTests
         Assert.False(scene.TryDequeueMapTransition(out _));
     }
 
-    [Fact]
-    public void LiveScene_MapCandidateKeepsOldCombatUntilArrival()
+    [Theory]
+    [InlineData(ClientVersion.Purple)]
+    [InlineData(ClientVersion.Steam)]
+    public void LiveScene_MapCandidateKeepsOldCombatUntilArrival(ClientVersion client)
     {
-        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch);
+        var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch, SceneClientContext.Create(ClientProfiles.Get(client)));
         var sink = SceneSinkFactory.CreateForLive(scene)();
         sink.SetCurrentMap(Source(100, 1, 0x0240), 1001);
         Assert.True(scene.TryDequeueMapTransition(out var initialArchive));

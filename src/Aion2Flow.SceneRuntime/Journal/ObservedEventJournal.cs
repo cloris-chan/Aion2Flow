@@ -3,8 +3,10 @@ using Cloris.Aion2Flow.SceneRuntime.Observation;
 
 namespace Cloris.Aion2Flow.SceneRuntime.Journal;
 
-public sealed class ObservedEventJournal(int capacity = 0)
+public sealed class ObservedEventJournal(int capacity = 0, SceneClientContext? clientContext = null)
 {
+    public SceneClientContext ClientContext { get; } = clientContext ?? SceneClientContext.Purple;
+
     internal const int SegmentCapacity = 512;
 
     private readonly Lock _gate = new();

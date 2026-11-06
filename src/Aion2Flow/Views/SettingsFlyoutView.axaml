@@ -59,6 +59,13 @@
                 <MenuItem x:Name="LanguageMenuItem"
                           Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
                           Loaded="LanguageMenuItemLoaded" />
+                <MenuItem x:Name="ClientVersionMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          ToolTip.Tip="{markups:Translate Settings_ClientVersion_ChangeHint}"
+                          Loaded="ClientVersionMenuItemLoaded" />
+                <MenuItem x:Name="ResourceLanguageMenuItem"
+                          Classes="FlyoutMenuItem FlyoutPanelRow SettingsRowItem"
+                          Loaded="ResourceLanguageMenuItemLoaded" />
             </Menu>
 
             <Border Classes="SettingsScaleRow">

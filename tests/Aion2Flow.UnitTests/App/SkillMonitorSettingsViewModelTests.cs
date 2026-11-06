@@ -1,3 +1,4 @@
+using Cloris.Aion2Flow.Clients;
 using Cloris.Aion2Flow.Services;
 using Cloris.Aion2Flow.Services.Settings;
 using Cloris.Aion2Flow.ViewModels;
@@ -116,7 +117,7 @@ public sealed class SkillMonitorSettingsViewModelTests
             var language = new LanguageService();
             language.SetLanguage(LanguageService.English);
             _localization = new LocalizationService(language);
-            _resources = new GameResourceService(language);
+            _resources = new GameResourceService(ClientProfiles.Purple, language.CurrentLanguage);
             Settings = new SettingsService(_settingsPath);
             ViewModel = new SkillMonitorSettingsViewModel(_resources, Settings, _localization);
         }

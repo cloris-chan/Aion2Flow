@@ -69,6 +69,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private long _displayTextRevision;
     private bool _isApplyingFrame;
     private bool _isDisposed;
+    private readonly GameResourceService _displayResources;
     private bool _frameApplyQueued;
     private bool _forceNextCombatantRefresh = true;
     private bool _forceNextEventWindowRefresh = true;
@@ -121,6 +122,8 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _sceneDescriptorSnapshot = source.CreateSnapshot();
         _frameBatchService = frameBatchService;
         DisplayContext = displayContext;
+        _displayResources = displayContext.Resources;
+        _displayResources.ResourcesChanged += OnResourceLanguageChanged;
         Localization = localization;
         CombatantDetails = new CombatantDetailsFlyoutViewModel(localization, frameBatchService)
         {
@@ -1927,6 +1930,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         _auraTimelineCancellation?.Cancel();
         _liveRefreshCancellation?.Cancel();
         Localization.LanguageChanged -= OnLanguageChanged;
+        _displayResources.ResourcesChanged -= OnResourceLanguageChanged;
         _settings.PropertyChanged -= OnSettingsPropertyChanged;
         _controller.FrameChanged -= OnFrameChanged;
         await _seekCoordinator.DisposeAsync().ConfigureAwait(false);
@@ -2025,6 +2029,15 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         OnPropertyChanged(nameof(EventScopeCategoryText));
         OnPropertyChanged(nameof(EventScopeSkillText));
         ApplyFrame(_currentFrame, _controller.State);
+    }
+
+    private void OnResourceLanguageChanged(object? sender, string language)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_isDisposed)
+                OnLanguageChanged(sender, EventArgs.Empty);
+        });
     }
 
     private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)

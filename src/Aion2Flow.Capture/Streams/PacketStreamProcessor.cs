@@ -7,6 +7,7 @@ public sealed class PacketStreamProcessor : IDisposable
     private readonly PacketTransportStreamDeframer _transport;
     private readonly IRuntimeObservationSink _sink;
     private readonly PacketFrameParser _parser;
+    private readonly ClientPacketProtocol _protocol;
     private readonly CanonicalPacketMirrorDeduplicator? _mirrorDeduplicator;
     private readonly long _connectionOrdinal;
     private long _nextCaptureSequence;
@@ -33,8 +34,9 @@ public sealed class PacketStreamProcessor : IDisposable
         long connectionOrdinal = 0)
     {
         _sink = sink;
+        _protocol = ClientPacketProtocol.Resolve(sink.ClientContext.Profile);
         _parser = new PacketFrameParser(sink, protocolRoundTripObserver, flushState, playerGroupState);
-        _transport = new PacketTransportStreamDeframer(framing, transportPrefixLength);
+        _transport = new PacketTransportStreamDeframer(framing, transportPrefixLength, _protocol);
         _mirrorDeduplicator = mirrorDeduplicator;
         _connectionOrdinal = connectionOrdinal;
     }
@@ -175,7 +177,7 @@ public sealed class PacketStreamProcessor : IDisposable
                 var parsed = EmitPacket(packet, in connection, in timestamp);
                 if (parsed ||
                     (!_transport.IsLengthPrefixed &&
-                     TcpWorldStreamClassifier.IsConfirmed0036(
+                     _protocol.IsConfirmedServerTick(
                          packet,
                          timestamp.TimelineUnixMilliseconds)))
                 {
@@ -224,7 +226,7 @@ public sealed class PacketStreamProcessor : IDisposable
         if (tickOffset > data.Length - 11)
             return false;
 
-        if (TcpWorldStreamClassifier.IsConfirmed0036(
+        if (_protocol.IsConfirmedServerTick(
                 data.Slice(tickOffset, 11),
                 timestamp.TimelineUnixMilliseconds))
         {
@@ -238,7 +240,7 @@ public sealed class PacketStreamProcessor : IDisposable
         return _transport.ResolvePendingLengthPrefixed();
     }
 
-    private static bool TryFindConfirmedTick(
+    private bool TryFindConfirmedTick(
         ReadOnlySpan<byte> data,
         long captureTimestampMilliseconds,
         out int offset)
@@ -248,7 +250,7 @@ public sealed class PacketStreamProcessor : IDisposable
              candidateOffset <= data.Length - tickFrameLength;
              candidateOffset++)
         {
-            if (TcpWorldStreamClassifier.IsConfirmed0036(
+            if (_protocol.IsConfirmedServerTick(
                     data.Slice(candidateOffset, tickFrameLength),
                     captureTimestampMilliseconds))
             {

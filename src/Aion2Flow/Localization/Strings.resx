@@ -83,7 +83,12 @@
   <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>Party</value></data>
   <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>Force</value></data>
   <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>All</value></data>
-  <data name="Settings_Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>Interface language</value></data>
+  <data name="Settings_ClientVersion" xml:space="preserve"><value>Game client</value></data>
+  <data name="Settings_ClientVersion_ChangeHint" xml:space="preserve"><value>Switching automatically archives the current scene and applies the selected game client.</value></data>
+  <data name="Settings_ClientVersion_Purple" xml:space="preserve"><value>PURPLE (KR/TW)</value></data>
+  <data name="Settings_ClientVersion_Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Settings_ResourceLanguage" xml:space="preserve"><value>Game resource language</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>UI scale</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Battle reset hotkey</value></data>
   <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>Display mode shortcut</value></data>

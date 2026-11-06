@@ -48,7 +48,7 @@ public static class SceneReplayTestView
             return pc.Nickname;
 
         if (replay.SceneOwner.MetadataRegistry.TryGetNpcCode(entityId, out var npcCode) &&
-            CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            replay.SceneOwner.ClientContext.CombatResources.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
             !string.IsNullOrWhiteSpace(catalogEntry.Name))
         {
             return catalogEntry.Name;

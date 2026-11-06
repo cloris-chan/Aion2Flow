@@ -138,6 +138,14 @@ internal static class PacketCaptureChannel
         }
     }
 
+    public static bool TryRead(out CaptureDispatchItem item)
+    {
+        if (!_channel.Reader.TryRead(out item))
+            return false;
+        _wake.Wait(0);
+        return true;
+    }
+
     public static void Drain()
     {
         while (_channel.Reader.TryRead(out var item))

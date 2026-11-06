@@ -83,7 +83,12 @@
   <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>組隊</value></data>
   <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>部隊</value></data>
   <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>全部</value></data>
-  <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>介面語言</value></data>
+  <data name="Settings_ClientVersion" xml:space="preserve"><value>遊戲客戶端</value></data>
+  <data name="Settings_ClientVersion_ChangeHint" xml:space="preserve"><value>切換時會自動歸檔目前場景，並套用所選的遊戲客戶端。</value></data>
+  <data name="Settings_ClientVersion_Purple" xml:space="preserve"><value>PURPLE（韓服／臺服）</value></data>
+  <data name="Settings_ClientVersion_Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Settings_ResourceLanguage" xml:space="preserve"><value>遊戲資源語言</value></data>
   <data name="Settings_UiScale" xml:space="preserve"><value>介面縮放</value></data>
   <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戰鬥重置快捷鍵</value></data>
   <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>顯示模式快捷鍵</value></data>

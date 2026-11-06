@@ -24,7 +24,7 @@ public sealed class SceneReadModelOwner(
     public const long BossFocusVisibilityTimeoutMilliseconds = 10_000;
     private readonly Lock _gate = new();
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
-    private readonly SceneProjectionState _projection = new(encounterId, entities, boundary, metadataRegistry, combat, combatOccurrenceObserver, auraLifecycleObserver);
+    private readonly SceneProjectionState _projection = new(encounterId, entities, boundary, metadataRegistry, combat, combatOccurrenceObserver, auraLifecycleObserver, journal.ClientContext);
     private readonly SceneCombatSnapshotBuilder _snapshotBuilder = new();
     private readonly Dictionary<int, CombatDetailSubscription> _detailSubscriptions = [];
     private readonly Dictionary<int, CombatDetailDelta> _lastDetailDeltas = [];
@@ -84,6 +84,7 @@ public sealed class SceneReadModelOwner(
     }
 
     public EntityStore Entities => _projection.Entities;
+    public SceneClientContext ClientContext => _projection.ClientContext;
     public SceneBoundaryStore Boundary => _projection.Boundary;
     public RuntimeMetadataRegistry MetadataRegistry => _projection.MetadataRegistry;
     public CombatStore Combat => _projection.Combat;
@@ -444,7 +445,7 @@ public sealed class SceneReadModelOwner(
         adapter.BuildSnapshot(_snapshotBuilder);
         ApplyBossFocusSnapshots(_snapshotBuilder, now);
         ApplyBossNpcCodes(_snapshotBuilder);
-        var snapshot = _snapshotBuilder.ToSnapshot(adapter.ReadModelRevision);
+        var snapshot = _snapshotBuilder.ToSnapshot(adapter.ReadModelRevision, ClientContext);
         _snapshotCacheKey = SnapshotCacheKey.From(EncounterId, _projection.Entities, _projection.Applier.EntityVitals, _projection.Boundary, _projection.Combat, _projection.Applier.Mechanics, _projection.Applier.Resources, _projection.Applier.BossFocus);
         _snapshotCache = snapshot;
         _snapshotCacheValidUntilMilliseconds = GetSnapshotCacheValidUntilMilliseconds(snapshot);
@@ -640,10 +641,10 @@ public readonly record struct BossDamageContribution(int BossId, int SourceComba
 
 internal readonly record struct BossDamageContributionKey(int BossId, int SourceCombatantId);
 
-internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long MechanicRevision, long ResourceRevision, long EntityIdentityRevision, long EntityVolatileStateRevision, long EntityVitalRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision, long SkillMapRevision)
+internal readonly record struct SnapshotCacheKey(Guid EncounterId, long CombatRevision, long MechanicRevision, long ResourceRevision, long EntityIdentityRevision, long EntityVolatileStateRevision, long EntityVitalRevision, long BoundaryRevision, long SceneTransitionRevision, long BossFocusRevision)
 {
     public static SnapshotCacheKey From(Guid encounterId, EntityStore entities, EntityVitalStore entityVitals, SceneBoundaryStore boundary, CombatStore combat, MechanicStore mechanics, ResourceStore resources, BossFocusStore bossFocus) =>
-        new(encounterId, combat.Revision, mechanics.Revision, resources.Revision, entities.IdentityRevision, entities.VolatileStateRevision, entityVitals.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision, CombatResourceRegistry.SkillMapRevision);
+        new(encounterId, combat.Revision, mechanics.Revision, resources.Revision, entities.IdentityRevision, entities.VolatileStateRevision, entityVitals.Revision, boundary.Revision, boundary.SceneTransitionRevision, bossFocus.Revision);
 }
 
 public readonly record struct ProjectionCacheStats(long SnapshotBuilds, long SnapshotCacheHits)

@@ -13,10 +13,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 
 public sealed class AuraSemanticMaterializationTests
 {
-    public AuraSemanticMaterializationTests()
-    {
-        CombatResourceRegistry.SetGameResources(ResourceCatalog.Load(ResourceLanguage.English));
-    }
 
     [Theory]
     [InlineData(140_600_401u, AuraDisposition.Debuff)]
@@ -334,6 +330,7 @@ public sealed class AuraSemanticMaterializationTests
 
     private sealed class TestPlaybackSource(Guid encounterId, SceneJournalSegment segment) : IScenePlaybackSource
     {
+        public Cloris.Aion2Flow.SceneRuntime.SceneClientContext ClientContext => segment.ClientContext;
         public Guid EncounterId { get; } = encounterId;
         public DateTimeOffset SceneStarted => DateTimeOffset.UnixEpoch;
         public ScenePlaybackSourceKind SourceKind => ScenePlaybackSourceKind.Archived;

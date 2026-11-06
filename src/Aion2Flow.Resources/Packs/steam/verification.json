@@ -1,0 +1,73 @@
+{
+  "ResourceSetId": "steam",
+  "DefaultLanguage": "en-US",
+  "SkillDefinitions": 15541,
+  "NpcDefinitions": 12620,
+  "RuntimeSemanticRoundTripVerified": true,
+  "Locales": [
+    {
+      "Language": "en-US",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "6db0c40af8f9231c65315e5e9359f1bebe97ae3d0af091fc8f1422f16749af3a"
+    },
+    {
+      "Language": "ko-KR",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "3074f3a958663592b87af3f0c21306c5349887da9ef16ce815f20473d6ee1f90"
+    },
+    {
+      "Language": "ja-JP",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "de3305494271a8b80994a24de181f6cca9aecc4468e1778558a61e3da4cfe860"
+    },
+    {
+      "Language": "de-DE",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "d218e4456a9131df1e98d5ced43c55f29ba15fda167e41e6d31794e2a039853c"
+    },
+    {
+      "Language": "fr-FR",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "d7c192aa2e62d99c2f37d7317e3d77f412825a51cea9d7d0975024e72dd6cb61"
+    },
+    {
+      "Language": "es-ES",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "3539deaf197777924e07f9fbef1c5b3c3f15f7e53d4ab868026cc7c9978c733a"
+    },
+    {
+      "Language": "pt-BR",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "d0a207ef1f2e442e5a3e3325c5075958f01aa8ac95ed3576b5ec26aaea70e9d9"
+    },
+    {
+      "Language": "ru-RU",
+      "Skills": 15541,
+      "Npcs": 12620,
+      "Maps": 803,
+      "Servers": 749,
+      "Sha256": "b55abcf4a6f61509b611011cf76a6d0b74935470dda4eb37d5ef5c5fbde2dcd0"
+    }
+  ]
+}

@@ -16,38 +16,39 @@ namespace Cloris.Aion2Flow.Capture.Diagnostics;
 
 public sealed class PacketLogReplayService
 {
-    public static PacketLogReplayResult Replay(string path)
-        => ReplayFile(path, CancellationToken.None, null, null);
+    public static PacketLogReplayResult Replay(string path, SceneClientContext? clientContext = null)
+        => ReplayFile(path, CancellationToken.None, null, null, clientContext);
 
-    public static PacketLogReplayResult Replay(string path, ICombatOccurrenceObserver combatOccurrenceObserver)
+    public static PacketLogReplayResult Replay(string path, ICombatOccurrenceObserver combatOccurrenceObserver, SceneClientContext? clientContext = null)
     {
         ArgumentNullException.ThrowIfNull(combatOccurrenceObserver);
-        return ReplayFile(path, CancellationToken.None, combatOccurrenceObserver, null);
+        return ReplayFile(path, CancellationToken.None, combatOccurrenceObserver, null, clientContext);
     }
 
-    public static PacketLogReplayResult Replay(string path, ISceneEventObserver sceneEventObserver)
+    public static PacketLogReplayResult Replay(string path, ISceneEventObserver sceneEventObserver, SceneClientContext? clientContext = null)
     {
         ArgumentNullException.ThrowIfNull(sceneEventObserver);
-        return ReplayFile(path, CancellationToken.None, sceneEventObserver, sceneEventObserver);
+        return ReplayFile(path, CancellationToken.None, sceneEventObserver, sceneEventObserver, clientContext);
     }
 
-    public static PacketLogReplayResult ReplayCancellable(string path, CancellationToken cancellationToken)
-        => ReplayFile(path, cancellationToken, null, null);
+    public static PacketLogReplayResult ReplayCancellable(string path, CancellationToken cancellationToken, SceneClientContext? clientContext = null)
+        => ReplayFile(path, cancellationToken, null, null, clientContext);
 
-    private static PacketLogReplayResult ReplayFile(string path, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
+    private static PacketLogReplayResult ReplayFile(string path, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver, SceneClientContext? clientContext)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
         using var reader = File.OpenText(path);
-        return ReplayCore(reader, path, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver);
+        return ReplayCore(reader, path, cancellationToken, combatOccurrenceObserver, auraLifecycleObserver, CaptureClientMetadata.Resolve(path, clientContext));
     }
 
-    public static PacketLogReplayResult ReplayMany(IEnumerable<string> paths)
-        => ReplayMany(paths, null);
+    public static PacketLogReplayResult ReplayMany(IEnumerable<string> paths, SceneClientContext? clientContext = null)
+        => ReplayMany(paths, null, clientContext);
 
     internal static PacketLogReplayResult ReplayMany(
         IEnumerable<string> paths,
-        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+        SceneClientContext? clientContext = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
 
@@ -56,6 +57,9 @@ public sealed class PacketLogReplayService
             .ToArray();
         if (replayPaths.Length == 0)
             throw new ArgumentException("At least one replay path is required.", nameof(paths));
+
+        foreach (var replayPath in replayPaths)
+            clientContext = CaptureClientMetadata.Resolve(replayPath, clientContext);
 
         var sourceName = string.Join(
             "+",
@@ -76,10 +80,11 @@ public sealed class PacketLogReplayService
             CancellationToken.None,
             null,
             null,
-            protocolRoundTripObserver);
+            protocolRoundTripObserver,
+            clientContext);
     }
 
-    public static PacketLogReplayResult ReplayDirectory(string directory)
+    public static PacketLogReplayResult ReplayDirectory(string directory, SceneClientContext? clientContext = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 
@@ -94,13 +99,13 @@ public sealed class PacketLogReplayService
             .Select(static path => Path.Combine(path, "stream.log"))
             .Where(static path => File.Exists(path) && new FileInfo(path).Length > 0)
             .ToArray();
-        return ReplayMany(replayPaths);
+        return ReplayMany(replayPaths, clientContext);
     }
 
-    public static PacketLogReplayResult Replay(TextReader reader, string sourceName)
-        => ReplayCore(reader, sourceName, CancellationToken.None, null, null);
+    public static PacketLogReplayResult Replay(TextReader reader, string sourceName, SceneClientContext? clientContext = null)
+        => ReplayCore(reader, sourceName, CancellationToken.None, null, null, clientContext);
 
-    private static PacketLogReplayResult ReplayCore(TextReader reader, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver)
+    private static PacketLogReplayResult ReplayCore(TextReader reader, string sourceName, CancellationToken cancellationToken, ICombatOccurrenceObserver? combatOccurrenceObserver, IAuraLifecycleObserver? auraLifecycleObserver, SceneClientContext? clientContext)
     {
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceName);
@@ -111,7 +116,8 @@ public sealed class PacketLogReplayService
             cancellationToken,
             combatOccurrenceObserver,
             auraLifecycleObserver,
-            null);
+            null,
+            clientContext);
     }
 
     private static IEnumerable<string> ReadLines(TextReader reader, CancellationToken cancellationToken)
@@ -145,7 +151,8 @@ public sealed class PacketLogReplayService
         CancellationToken cancellationToken,
         ICombatOccurrenceObserver? combatOccurrenceObserver,
         IAuraLifecycleObserver? auraLifecycleObserver,
-        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver)
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+        SceneClientContext? clientContext)
     {
         var sceneStarted = DateTimeOffset.UtcNow;
         var replayTimeProvider = new ReplayTimeProvider(sceneStarted);
@@ -153,7 +160,8 @@ public sealed class PacketLogReplayService
             sceneStarted,
             replayTimeProvider,
             combatOccurrenceObserver,
-            auraLifecycleObserver);
+            auraLifecycleObserver,
+            clientContext);
         var journal = scene.Journal;
         var sinkFactory = SceneSinkFactory.CreateForLive(scene);
         var replayedEventCounts = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -164,7 +172,8 @@ public sealed class PacketLogReplayService
                 sinkFactory,
                 mirrorDeduplicator,
                 connection.ConnectionOrdinal,
-                protocolRoundTripObserver),
+                protocolRoundTripObserver,
+                scene.ClientContext),
             mirrorDeduplicator);
         var totalLines = 0;
         var replayedLines = 0;
@@ -373,12 +382,12 @@ public sealed class PacketLogReplayService
 
             if (sourceId > 0)
             {
-                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
             }
 
             if (targetId > 0)
             {
-                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
             }
 
             var contribution = e.Contribution;
@@ -417,9 +426,9 @@ public sealed class PacketLogReplayService
             var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
             var targetId = e.TargetId;
             if (sourceId > 0)
-                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
             if (targetId > 0)
-                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
 
             var mechanic = e.Mechanic;
             ApplyMechanicSummary(summariesByCombatantId, sourceId, targetId, in mechanic);
@@ -435,9 +444,9 @@ public sealed class PacketLogReplayService
             var sourceId = adapter.ResolveDetailCombatantId(e.SourceId);
             var targetId = e.TargetId;
             if (sourceId > 0)
-                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, sourceId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
             if (targetId > 0)
-                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry);
+                EnsureSummary(summariesByCombatantId, targetId, entities, metadataRegistry, snapshot.ClientContext.CombatResources);
         }
 
         return [.. summariesByCombatantId.OrderBy(static pair => pair.Key).Select(static pair => pair.Value.ToSummary())];
@@ -518,7 +527,8 @@ public sealed class PacketLogReplayService
         Dictionary<int, MutableCombatantSummary> summariesByCombatantId,
         int combatantId,
         EntityStore entities,
-        RuntimeMetadataRegistry metadataRegistry)
+        RuntimeMetadataRegistry metadataRegistry,
+        CombatResourceRegistry resources)
     {
         if (summariesByCombatantId.TryGetValue(combatantId, out var existing))
         {
@@ -527,7 +537,7 @@ public sealed class PacketLogReplayService
 
         var created = new MutableCombatantSummary(
             combatantId,
-            ResolveDisplayName(entities, metadataRegistry, combatantId));
+            ResolveDisplayName(entities, metadataRegistry, combatantId, resources));
         summariesByCombatantId[combatantId] = created;
         return created;
     }
@@ -650,7 +660,7 @@ public sealed class PacketLogReplayService
         return e.Contribution.Metric is CombatMetricKind.Healing or CombatMetricKind.ShieldGranted or CombatMetricKind.ShieldAbsorbed;
     }
 
-    private static string ResolveDisplayName(EntityStore entities, RuntimeMetadataRegistry metadataRegistry, int entityId)
+    private static string ResolveDisplayName(EntityStore entities, RuntimeMetadataRegistry metadataRegistry, int entityId, CombatResourceRegistry resources)
     {
         if (metadataRegistry.TryGetPcMetadata(entityId, out var pc) && pc.HasNickname)
         {
@@ -658,7 +668,7 @@ public sealed class PacketLogReplayService
         }
 
         if (metadataRegistry.TryGetNpcCode(entityId, out var npcCode) &&
-            CombatResourceRegistry.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
+            resources.TryResolveNpcCatalogEntry(npcCode, out var catalogEntry) &&
             !string.IsNullOrWhiteSpace(catalogEntry.Name))
         {
             return catalogEntry.Name;
@@ -672,7 +682,7 @@ public sealed class PacketLogReplayService
             }
 
             if (entity.NpcCode is int entityNpcCode &&
-                CombatResourceRegistry.TryResolveNpcCatalogEntry(entityNpcCode, out var entityCatalogEntry) &&
+                resources.TryResolveNpcCatalogEntry(entityNpcCode, out var entityCatalogEntry) &&
                 !string.IsNullOrWhiteSpace(entityCatalogEntry.Name))
             {
                 return entityCatalogEntry.Name;
@@ -1289,9 +1299,10 @@ public sealed class PacketLogReplayService
         Func<IRuntimeObservationSink> liveSinkFactory,
         CanonicalPacketMirrorDeduplicator mirrorDeduplicator,
         long connectionOrdinal,
-        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver) : IDisposable
+        Action<ProtocolRoundTripObservation>? protocolRoundTripObserver,
+        SceneClientContext clientContext) : IDisposable
     {
-        private readonly TcpConnectionStartClassifier _classifier = new();
+        private readonly TcpConnectionStartClassifier _classifier = new(ClientPacketProtocol.Resolve(clientContext.Profile));
         private readonly List<ReplayAcceptedPayload> _pendingPayloads = [];
         private int _transportPrefixLength;
         private PacketTransportFraming _framing;
@@ -1398,11 +1409,11 @@ public sealed class PacketLogReplayService
             _pendingPayloads.Clear();
         }
 
-        private static PacketStreamProcessor CreateProbeProcessor(
+        private PacketStreamProcessor CreateProbeProcessor(
             PacketTransportFraming framing,
             int transportPrefixLength)
         {
-            var journal = new ObservedEventJournal();
+            var journal = new ObservedEventJournal(clientContext: clientContext);
             var sink = new JournalingRuntimeObservationSink(
                 journal,
                 new SceneRuntimeClock(0),
