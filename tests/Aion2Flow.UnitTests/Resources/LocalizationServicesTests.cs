@@ -1,4 +1,8 @@
+using System.Collections;
+using System.Globalization;
+using System.Resources;
 using Cloris.Aion2Flow.Clients;
+using Cloris.Aion2Flow.Localization;
 using Cloris.Aion2Flow.Resources.Catalog;
 using Cloris.Aion2Flow.SceneRuntime;
 using Cloris.Aion2Flow.Services;
@@ -8,6 +12,36 @@ namespace Cloris.Aion2Flow.Tests.Resources;
 
 public sealed class LocalizationServicesTests
 {
+    [Fact]
+    public void InterfaceLanguagesCoverSteamAndHaveCompleteTranslations()
+    {
+        var supportedLanguages = LanguageService.SupportedLanguages;
+        foreach (var language in ResourceCatalog.GetResourceSet(ClientProfiles.Steam).Languages)
+        {
+            Assert.Contains(language, supportedLanguages);
+        }
+
+        Assert.Contains(LanguageService.TraditionalChinese, supportedLanguages);
+        var manager = new ResourceManager(Strings.ResourceManager.BaseName, typeof(Strings).Assembly);
+        var neutral = manager.GetResourceSet(CultureInfo.InvariantCulture, createIfNotExists: true, tryParents: false);
+        Assert.NotNull(neutral);
+        var keys = neutral.Cast<DictionaryEntry>().Select(entry => (string)entry.Key).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var language in supportedLanguages)
+        {
+            var culture = language == LanguageService.English
+                ? CultureInfo.InvariantCulture
+                : CultureInfo.GetCultureInfo(language);
+            var translations = manager.GetResourceSet(culture, createIfNotExists: true, tryParents: false);
+            Assert.True(translations is not null, $"Missing interface resources for {language}.");
+            Assert.Equal(keys.Count, translations.Cast<DictionaryEntry>().Count());
+            foreach (var key in keys)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(translations.GetString(key)), $"Missing {key} in {language}.");
+            }
+        }
+    }
+
     [Fact]
     public void LocalizationService_Indexer_Updates_When_Language_Changes()
     {

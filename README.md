@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/955dc75a-6dcc-487f-9081-ed9434895b36
 - Capture status and game round-trip latency shown directly on the overlay.
 - Interactive, click-through, and hidden overlay modes, plus configurable global shortcuts for display mode and battle reset.
 - UI scale, topmost behavior, visible row count, sorting, metric visibility, compact numbers, and player-name display settings.
-- Traditional Chinese, English, and Korean UI, configured independently from game resource language. PURPLE resources support these three languages; Steam resources support English, Korean, German, Spanish, French, Japanese, Portuguese, and Russian.
+- Interface languages include Traditional Chinese, English, Korean, German, Spanish, French, Japanese, Brazilian Portuguese, and Russian. The separate game resource setting offers Traditional Chinese, English, and Korean for PURPLE and eight languages for Steam.
 - Automatic update checks and downloads for Velopack-managed releases.
 
 ## Requirements

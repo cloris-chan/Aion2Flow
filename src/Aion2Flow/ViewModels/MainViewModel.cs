@@ -248,7 +248,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     {
         Dispatcher.UIThread.Post(() =>
         {
-            Status = message;
+            Status = _captureService.HasDriverError
+                ? message
+                : Localization[_captureService.IsDriverActive ? "Status_DriverReady" : "Status_DriverIdle"];
             RefreshCaptureIndicators();
         });
     }

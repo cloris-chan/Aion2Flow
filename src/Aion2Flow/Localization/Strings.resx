@@ -57,7 +57,7 @@
   <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>Server name</value></data>
   <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>Show</value></data>
   <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>Hide</value></data>
-  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Legion name</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Legion Name</value><comment>Game L10N String_UI_LEGION_INFO_LEGIONNAME_body.</comment></data>
   <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>Show</value></data>
   <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>Hide</value></data>
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Faction tint</value></data>
@@ -71,17 +71,17 @@
   <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>Select all</value></data>
   <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>Clear all</value></data>
   <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Buff duration</value></data>
-  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>Cooldown</value></data>
-  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>Buff</value></data>
-  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>Cooldown</value></data>
+  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>Cooldown</value><comment>Game L10N String_UI_SKILLINFO_SUBTITLE_COOLTIME_body.</comment></data>
+  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>Buff</value><comment>Game L10N String_STR_Chat_TypeCombat_Abnormal_body, String_STR_SKILL_CATEGORY_TYPE_BUFF_body.</comment></data>
+  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>Cooldown</value><comment>Game L10N String_UI_SKILLINFO_SUBTITLE_COOLTIME_body.</comment></data>
   <data name="Settings_SkillMonitor_BuffSelectedFormat" xml:space="preserve"><value>Buffs {0}/{1}</value></data>
   <data name="Settings_SkillMonitor_CooldownSelectedFormat" xml:space="preserve"><value>Cooldowns {0}/{1}</value></data>
   <data name="Settings_SkillMonitor_Scale" xml:space="preserve"><value>Monitor scale</value></data>
   <data name="Settings_VisibleRows" xml:space="preserve"><value>Visible rows</value></data>
   <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>Statistics scope</value></data>
   <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>Self</value></data>
-  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>Party</value></data>
-  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>Force</value></data>
+  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>Party</value><comment>Game L10N String_UI_PARTY_FORCE_POPUP_MENU_SETTING_BUTTON_PARTY_body.</comment></data>
+  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>Force</value><comment>Game L10N String_UI_FORCE_TITLE_body.</comment></data>
   <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>All</value></data>
   <data name="Settings_Language" xml:space="preserve"><value>Interface language</value></data>
   <data name="Settings_ClientVersion" xml:space="preserve"><value>Game client</value></data>
@@ -132,25 +132,25 @@
   <data name="Direction_Sources" xml:space="preserve"><value>Sources</value></data>
 
   <!-- Combat category -->
-  <data name="Category_Damage" xml:space="preserve"><value>Damage</value></data>
+  <data name="Category_Damage" xml:space="preserve"><value>Damage</value><comment>Game L10N String_STR_Chat_TypeCombat_Damage_body.</comment></data>
   <data name="Category_Healing" xml:space="preserve"><value>Healing</value></data>
-  <data name="Category_Shield" xml:space="preserve"><value>Protective Shield</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>Protective Shield</value><comment>Game L10N SkillAbnormalString_SkillAbnormalString_16000301_desc_name.</comment></data>
 
   <!-- Empty-state placeholders -->
   <data name="Empty_History" xml:space="preserve"><value>No archived battles</value></data>
   <data name="Empty_Combatants" xml:space="preserve"><value>No combat data yet</value></data>
   <data name="Empty_Skills" xml:space="preserve"><value>No skill data</value></data>
   <data name="Skill_UnknownEffect" xml:space="preserve"><value>Unknown effect</value></data>
-  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>Player</value></data>
-  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>Gladiator</value></data>
-  <data name="CharacterClass_Templar" xml:space="preserve"><value>Templar</value></data>
-  <data name="CharacterClass_Assassin" xml:space="preserve"><value>Assassin</value></data>
-  <data name="CharacterClass_Ranger" xml:space="preserve"><value>Ranger</value></data>
-  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>Sorcerer</value></data>
-  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>Elementalist</value></data>
-  <data name="CharacterClass_Cleric" xml:space="preserve"><value>Cleric</value></data>
-  <data name="CharacterClass_Chanter" xml:space="preserve"><value>Chanter</value></data>
-  <data name="CharacterClass_Brawler" xml:space="preserve"><value>Brawler</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>Player</value><comment>Game L10N String_UI_NAMEPLATE_MYNAME_STREAMER_MODE_body.</comment></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>Gladiator</value><comment>Game L10N String_STR_CLASS_GLADIATOR_body.</comment></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>Templar</value><comment>Game L10N String_STR_CLASS_TEMPLAR_body.</comment></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>Assassin</value><comment>Game L10N String_STR_CLASS_ASSASSIN_body.</comment></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>Ranger</value><comment>Game L10N String_STR_CLASS_RANGER_body.</comment></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>Sorcerer</value><comment>Game L10N String_STR_CLASS_SORCERER_body.</comment></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>Spiritmaster</value><comment>Game L10N String_STR_CLASS_ELEMENTALIST_body.</comment></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>Cleric</value><comment>Game L10N String_STR_CLASS_CLERIC_body.</comment></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>Chanter</value><comment>Game L10N String_STR_CLASS_CHANTER_body.</comment></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>Brawler</value><comment>Game L10N String_STR_CLASS_FIGHTER_body.</comment></data>
 
   <!-- Aggregate metrics (full names, used as labels and table headers) -->
   <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>
@@ -161,7 +161,7 @@
   <data name="Metric_DirectHealing" xml:space="preserve"><value>Direct Healing</value></data>
   <data name="Metric_Attacks" xml:space="preserve"><value>Attacks</value></data>
   <data name="Metric_HitCount" xml:space="preserve"><value>Hit Count</value></data>
-  <data name="Metric_Skills" xml:space="preserve"><value>Skills</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>Skills</value><comment>Game L10N String_UI_HUD_MAINMENU_BUTTON_SKILL_body.</comment></data>
   <data name="Metric_HealingSkills" xml:space="preserve"><value>Healing Skills</value></data>
   <data name="Metric_ShieldSkills" xml:space="preserve"><value>Shield Skills</value></data>
   <data name="Metric_HealingHits" xml:space="preserve"><value>Healing Hits</value></data>
@@ -177,24 +177,24 @@
   <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>Periodic Hits</value></data>
 
   <!-- Combat stats (shared between summary tiles and column headers) -->
-  <data name="Stat_Critical" xml:space="preserve"><value>Critical</value></data>
-  <data name="Stat_Perfect" xml:space="preserve"><value>Perfect</value></data>
-  <data name="Stat_Smite" xml:space="preserve"><value>Smite</value></data>
-  <data name="Stat_MultiHit" xml:space="preserve"><value>Multi-Hit</value></data>
-  <data name="Stat_Front" xml:space="preserve"><value>Front Attack</value></data>
-  <data name="Stat_Parry" xml:space="preserve"><value>Weapon Parry</value></data>
-  <data name="Stat_PerfectParry" xml:space="preserve"><value>Perfect Weapon Parry</value></data>
-  <data name="Stat_Endurance" xml:space="preserve"><value>Endurance</value></data>
-  <data name="Stat_Regeneration" xml:space="preserve"><value>Regeneration</value></data>
-  <data name="Stat_Back" xml:space="preserve"><value>Back Attack</value></data>
-  <data name="Stat_Block" xml:space="preserve"><value>Shield Block</value></data>
-  <data name="Stat_PerfectBlock" xml:space="preserve"><value>Perfect Shield Block</value></data>
-  <data name="Stat_Evade" xml:space="preserve"><value>Evade</value></data>
-  <data name="Stat_Invincible" xml:space="preserve"><value>Invincible</value></data>
+  <data name="Stat_Critical" xml:space="preserve"><value>Critical</value><comment>Game L10N String_StatName_Critical_body, String_STR_CHAT_DAMAGEINFO_CRITICAL_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>Perfect</value><comment>Game L10N String_StatName_Perfect_body, String_STR_CHAT_DAMAGEINFO_PERFECT_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>Double</value><comment>Game L10N String_UI_DAMAGEANALYZER_INFO_GUIDE_DETAILED_MODE_body, String_StatName_HardHit_body, String_STR_CHAT_DAMAGEINFO_DOUBLE_EMPTY_ME_body.</comment></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>Multi-Hit</value><comment>Game L10N String_UI_DAMAGEANALYZER_INFO_GUIDE_DETAILED_MODE_body.</comment></data>
+  <data name="Stat_Front" xml:space="preserve"><value>Front Attack</value><comment>Game L10N String_StatName_FrontAttackDamage_body, String_UI_DAMAGEANALYZER_INFO_GUIDE_DETAILED_MODE_body, String_STR_CHAT_DAMAGEINFO_FRONT_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>Parry</value><comment>Game L10N String_StatName_WeaponBlock_body.</comment></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>Perfect Parry</value><comment>Game L10N String_STR_CHAT_DAMAGEINFO_PERFECTWEAPONBLOCK_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>Endurance</value><comment>Game L10N String_StatName_IronWall_body.</comment></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>Regeneration</value><comment>Game L10N String_StatName_Restoration_body.</comment></data>
+  <data name="Stat_Back" xml:space="preserve"><value>Back Attack</value><comment>Game L10N String_StatName_BackAttackDamage_body, String_UI_DAMAGEANALYZER_INFO_GUIDE_DETAILED_MODE_body, String_STR_CHAT_DAMAGEINFO_BACK_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Block" xml:space="preserve"><value>Shield Block</value><comment>Game L10N String_StatName_ShieldBlock_body.</comment></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>Perfect Shield Block</value><comment>Game L10N String_STR_CHAT_DAMAGEINFO_PERFECTSHIELDBLOCK_EMPTY_ME_body.</comment></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>Evasion</value><comment>Game L10N String_StatName_ArmorEvasion_body, String_UI_SKILL_LIST_CATEGORY_EVADE_body.</comment></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>Invincible</value><comment>Game L10N SkillAbnormalString_SkillAbnormalString_12000401_desc_name.</comment></data>
 
   <!-- UI-specific column headers that don't fit other categories -->
   <data name="Column_History" xml:space="preserve"><value>History</value></data>
-  <data name="Column_Skill" xml:space="preserve"><value>Skill</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>Skill</value><comment>Game L10N String_UI_KEYMAPPING_CATEGORY_QUICKSLOT_SKILL_body.</comment></data>
   <data name="Column_Direct" xml:space="preserve"><value>Direct</value></data>
   <data name="Column_Max" xml:space="preserve"><value>Max</value></data>
   <data name="Column_Min" xml:space="preserve"><value>Min</value></data>
@@ -211,14 +211,14 @@
   <data name="Column_HeaderPacket" xml:space="preserve"><value>Header Packet</value></data>
   <data name="Column_Packet" xml:space="preserve"><value>Packet</value></data>
   <data name="Column_Source" xml:space="preserve"><value>Source</value></data>
-  <data name="Column_Target" xml:space="preserve"><value>Target</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>Target</value><comment>Game L10N String_UI_DAMAGEANALYZER_RECORD_TARGET_body.</comment></data>
   <data name="Column_Time" xml:space="preserve"><value>Time</value></data>
   <data name="Column_Value" xml:space="preserve"><value>Value</value></data>
   <data name="Column_Effect" xml:space="preserve"><value>Effect</value></data>
   <data name="Column_Canonicalization" xml:space="preserve"><value>Canonicalization</value></data>
   <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>Sort By</value></data>
   <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
-  <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>Total Damage</value></data>
+  <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>Total Damage</value><comment>Game L10N String_UI_DAMAGEANALYZER_SKILL_TOTAL_DAMAGE_body.</comment></data>
 
   <data name="Playback_WindowTitleFormat" xml:space="preserve"><value>Playback (Experimental) - {0}</value></data>
   <data name="Playback_Open" xml:space="preserve"><value>Playback</value></data>
@@ -243,25 +243,25 @@
   <data name="Playback_Metric_Coverage" xml:space="preserve"><value>Coverage</value></data>
   <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>Active</value></data>
   <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatant</value></data>
-  <data name="Playback_Column_Damage" xml:space="preserve"><value>Damage</value></data>
+  <data name="Playback_Column_Damage" xml:space="preserve"><value>Damage</value><comment>Game L10N String_STR_Chat_TypeCombat_Damage_body.</comment></data>
   <data name="Playback_Column_Healing" xml:space="preserve"><value>Healing</value></data>
   <data name="Playback_Column_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
   <data name="Playback_Column_Time" xml:space="preserve"><value>Time</value></data>
   <data name="Playback_Column_Track" xml:space="preserve"><value>Track</value></data>
   <data name="Playback_Column_Source" xml:space="preserve"><value>Source</value></data>
-  <data name="Playback_Column_Target" xml:space="preserve"><value>Target</value></data>
-  <data name="Playback_Column_Skill" xml:space="preserve"><value>Skill</value></data>
+  <data name="Playback_Column_Target" xml:space="preserve"><value>Target</value><comment>Game L10N String_UI_DAMAGEANALYZER_RECORD_TARGET_body.</comment></data>
+  <data name="Playback_Column_Skill" xml:space="preserve"><value>Skill</value><comment>Game L10N String_UI_KEYMAPPING_CATEGORY_QUICKSLOT_SKILL_body.</comment></data>
   <data name="Playback_Column_Amount" xml:space="preserve"><value>Amount</value></data>
   <data name="Playback_Track_Combat" xml:space="preserve"><value>Combat</value></data>
   <data name="Playback_Track_Mechanic" xml:space="preserve"><value>Mechanics</value></data>
-  <data name="Playback_Track_Resource" xml:space="preserve"><value>Resources</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>Resources</value><comment>Game L10N String_UI_CHARACTERSTATUS_SUBTITLE_Recovery_body.</comment></data>
   <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Remaining HP</value></data>
   <data name="Playback_Track_Aura" xml:space="preserve"><value>Effect lifecycle</value></data>
   <data name="Playback_AuraCoverage" xml:space="preserve"><value>Buff / Debuff</value></data>
   <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>Effect #{0}</value></data>
   <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>Disposition</value></data>
-  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>Buff</value></data>
-  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>Debuff</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>Buff</value><comment>Game L10N String_STR_Chat_TypeCombat_Abnormal_body, String_STR_SKILL_CATEGORY_TYPE_BUFF_body.</comment></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>Debuff</value><comment>Game L10N String_STR_Chat_TypeCombat_Abnormal_body, String_STR_SKILL_CATEGORY_TYPE_DEBUFF_body.</comment></data>
   <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>Exact node #{0}</value></data>
   <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>Skill {0}, slot {1}</value></data>
@@ -284,7 +284,7 @@
   <data name="Scene_Teardown" xml:space="preserve"><value>Scene Teardown</value></data>
   <data name="Scene_Archive" xml:space="preserve"><value>Scene Archive</value></data>
   <data name="Scene_Unknown" xml:space="preserve"><value>Unknown Scene</value></data>
-  <data name="Category_Resource" xml:space="preserve"><value>Resources</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>Resources</value><comment>Game L10N String_UI_CHARACTERSTATUS_SUBTITLE_Recovery_body.</comment></data>
   <data name="Metric_ManaChange" xml:space="preserve"><value>MP change</value></data>
   <data name="Metric_DirectEvents" xml:space="preserve"><value>Direct events</value></data>
   <data name="Metric_PeriodicEvents" xml:space="preserve"><value>Periodic events</value></data>

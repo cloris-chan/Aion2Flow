@@ -10,9 +10,15 @@ public sealed class LanguageService
 
     public static readonly IReadOnlyList<string> SupportedLanguages =
     [
+        TraditionalChinese,
         English,
         Korean,
-        TraditionalChinese,
+        "de-DE",
+        "es-ES",
+        "fr-FR",
+        "ja-JP",
+        "pt-BR",
+        "ru-RU",
     ];
 
     private CultureInfo _currentCulture = ResolveDefaultCulture();
@@ -47,12 +53,17 @@ public sealed class LanguageService
     }
 
     private static CultureInfo ResolveDefaultCulture()
-        => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName switch
+    {
+        var systemLanguage = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        foreach (var language in SupportedLanguages)
         {
-            "ko" => CultureInfo.GetCultureInfo(Korean),
-            "zh" => CultureInfo.GetCultureInfo(TraditionalChinese),
-            _ => CultureInfo.GetCultureInfo(English),
-        };
+            var culture = CultureInfo.GetCultureInfo(language);
+            if (culture.TwoLetterISOLanguageName == systemLanguage)
+                return culture;
+        }
+
+        return CultureInfo.GetCultureInfo(English);
+    }
 
     private static void ApplyToCurrentThread(CultureInfo culture)
     {

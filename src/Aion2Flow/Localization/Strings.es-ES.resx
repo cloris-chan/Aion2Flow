@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Action -->
+  <data name="Action_BattleReset" xml:space="preserve"><value>Restablecer combate</value></data>
+  <data name="Action_Live" xml:space="preserve"><value>En directo</value></data>
+  <data name="Action_SelectAll" xml:space="preserve"><value>Seleccionar todo</value></data>
+  <data name="Action_Close" xml:space="preserve"><value>Cerrar</value></data>
+
+  <!-- Settings -->
+  <data name="Settings_Title" xml:space="preserve"><value>Ajustes</value></data>
+  <data name="Settings_Topmost" xml:space="preserve"><value>Siempre visible</value></data>
+  <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>Mientras el juego esté activo</value></data>
+  <data name="Settings_Topmost_Always" xml:space="preserve"><value>Siempre</value></data>
+  <data name="Settings_Topmost_Never" xml:space="preserve"><value>Nunca</value></data>
+  <data name="Settings_SceneKind" xml:space="preserve"><value>Modo de escena</value></data>
+  <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>Estándar</value></data>
+  <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>Solo jefes</value></data>
+  <data name="Settings_MainMetricVisibility" xml:space="preserve"><value>Métricas de la ventana principal</value></data>
+  <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>Columna de DPS</value></data>
+  <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>Columna de daño total</value></data>
+  <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>DPS total inferior</value></data>
+  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>Formato de tiempo</value></data>
+  <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
+  <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
+  <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>Abreviar cifras</value></data>
+  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>Activado</value></data>
+  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>Desactivado</value></data>
+  <data name="Settings_FocusStatusBar" xml:space="preserve"><value>Barra de estado del objetivo</value></data>
+  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>Activada</value></data>
+  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>Desactivada</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Barra de título con paso de clics</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Visibilidad de los nombres</value></data>
+  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>Nombres de jugadores</value></data>
+  <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>Marca del propio jugador</value></data>
+  <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>Desactivada</value></data>
+  <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>Con nombres ocultos</value></data>
+  <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>Siempre</value></data>
+  <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>Nombre del servidor</value></data>
+  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Nombre de legión</value></data>
+  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>Mostrar</value></data>
+  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Color por raza</value></data>
+  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>Activado</value></data>
+  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Desactivado</value></data>
+  <data name="Settings_SkillMonitor" xml:space="preserve"><value>Monitor de habilidades</value></data>
+  <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>Activar</value></data>
+  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>Configurar el monitor de habilidades</value></data>
+  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>Activado</value></data>
+  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>Desactivado</value></data>
+  <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>Seleccionar todo</value></data>
+  <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>Quitar toda la selección</value></data>
+  <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Duración de buffs</value></data>
+  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>Tiempo de Enfriamiento</value></data>
+  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>Buff</value></data>
+  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>Tiempo de Enfriamiento</value></data>
+  <data name="Settings_SkillMonitor_BuffSelectedFormat" xml:space="preserve"><value>Buffs {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_CooldownSelectedFormat" xml:space="preserve"><value>Tiempos de enfriamiento {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_Scale" xml:space="preserve"><value>Escala del monitor</value></data>
+  <data name="Settings_VisibleRows" xml:space="preserve"><value>Filas visibles</value></data>
+  <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>Ámbito de estadísticas</value></data>
+  <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>Solo yo</value></data>
+  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>Grupo</value></data>
+  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>Tropa</value></data>
+  <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>Todos</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>Idioma de la interfaz</value></data>
+  <data name="Settings_ClientVersion" xml:space="preserve"><value>Cliente del juego</value></data>
+  <data name="Settings_ClientVersion_ChangeHint" xml:space="preserve"><value>Al cambiar de cliente, se archiva automáticamente la escena actual y se aplica el cliente seleccionado.</value></data>
+  <data name="Settings_ClientVersion_Purple" xml:space="preserve"><value>PURPLE (KR/TW)</value></data>
+  <data name="Settings_ClientVersion_Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Settings_ResourceLanguage" xml:space="preserve"><value>Idioma de los datos del juego</value></data>
+  <data name="Settings_UiScale" xml:space="preserve"><value>Escala de la interfaz</value></data>
+  <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>Atajo para restablecer el combate</value></data>
+  <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>Atajo del modo de visualización</value></data>
+  <data name="Settings_Hotkey_None" xml:space="preserve"><value>Ninguno</value></data>
+  <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>Pulsa las teclas…</value></data>
+  <data name="Settings_Hotkey_RegistrationUnavailable" xml:space="preserve"><value>Atajo no disponible. Elige otra combinación de teclas.</value></data>
+  <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>Borrar atajo</value></data>
+  <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>Permitir el paso de clics</value></data>
+  <data name="Overlay_Action_Hide" xml:space="preserve"><value>Ocultar superposición</value></data>
+  <data name="Overlay_Action_Restore" xml:space="preserve"><value>Restaurar superposición</value></data>
+  <data name="SkillMonitor_Title" xml:space="preserve"><value>Monitor de habilidades</value></data>
+  <data name="SkillMonitor_Buffs" xml:space="preserve"><value>Buffs</value></data>
+  <data name="SkillMonitor_Cooldowns" xml:space="preserve"><value>Tiempos de enfriamiento</value></data>
+  <data name="SkillMonitor_Indefinite" xml:space="preserve"><value>∞</value></data>
+  <data name="SkillMonitor_UnknownSkill" xml:space="preserve"><value>Habilidad sin identificar</value></data>
+  <data name="Settings_Update_Check" xml:space="preserve"><value>Buscar actualizaciones</value></data>
+  <data name="Settings_Update_Restart" xml:space="preserve"><value>Reiniciar para actualizar</value></data>
+  <data name="Settings_Update_Checking" xml:space="preserve"><value>Buscando actualizaciones…</value></data>
+  <data name="Settings_Update_DownloadingFormat" xml:space="preserve"><value>Descargando… {0} %</value></data>
+  <data name="Settings_Update_UpToDate" xml:space="preserve"><value>Al día</value></data>
+  <data name="Settings_Update_ReadyFormat" xml:space="preserve"><value>La actualización {0} está lista. Reinicia la aplicación para aplicarla.</value></data>
+  <data name="Settings_Update_Failed" xml:space="preserve"><value>Error al actualizar</value></data>
+  <data name="Settings_Update_CurrentVersionFormat" xml:space="preserve"><value>v{0}</value></data>
+
+  <!-- Status -->
+  <data name="Status_Ready" xml:space="preserve"><value>Listo</value></data>
+  <data name="Status_DriverReady" xml:space="preserve"><value>WinDivert está activo</value></data>
+  <data name="Status_DriverIdle" xml:space="preserve"><value>WinDivert está inactivo</value></data>
+  <data name="Status_PortReady" xml:space="preserve"><value>Puertos del juego detectados</value></data>
+  <data name="Status_PortWaiting" xml:space="preserve"><value>Esperando los puertos del juego</value></data>
+  <data name="Status_PortIdle" xml:space="preserve"><value>No se están supervisando los puertos del juego</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>Conexión de combate identificada</value></data>
+  <data name="Status_Unlocked" xml:space="preserve"><value>Aún no se ha identificado la conexión de combate</value></data>
+  <data name="Status_LatencyMeasured" xml:space="preserve"><value>Latencia de ida y vuelta del juego</value></data>
+  <data name="Status_LatencyUnavailable" xml:space="preserve"><value>Aún no hay una medición de latencia</value></data>
+
+  <!-- Direction (Outgoing/Incoming and their counterpart aliases) -->
+  <data name="Direction_Outgoing" xml:space="preserve"><value>Saliente</value></data>
+  <data name="Direction_Incoming" xml:space="preserve"><value>Entrante</value></data>
+  <data name="Direction_Targets" xml:space="preserve"><value>Objetivos</value></data>
+  <data name="Direction_Sources" xml:space="preserve"><value>Orígenes</value></data>
+
+  <!-- Combat category -->
+  <data name="Category_Damage" xml:space="preserve"><value>Daño</value></data>
+  <data name="Category_Healing" xml:space="preserve"><value>Curación</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>Barrera</value></data>
+
+  <!-- Empty-state placeholders -->
+  <data name="Empty_History" xml:space="preserve"><value>No hay combates archivados</value></data>
+  <data name="Empty_Combatants" xml:space="preserve"><value>Todavía no hay datos de combate</value></data>
+  <data name="Empty_Skills" xml:space="preserve"><value>No hay datos de habilidades</value></data>
+  <data name="Skill_UnknownEffect" xml:space="preserve"><value>Efecto desconocido</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>Jugador</value></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>Gladiador</value></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>Templario</value></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>Asesino</value></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>Arquero</value></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>Hechicero</value></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>Espiritualista</value></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>Clérigo</value></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>Cantor</value></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>Luchador</value></data>
+
+  <!-- Aggregate metrics (full names, used as labels and table headers) -->
+  <data name="Metric_Total" xml:space="preserve"><value>Total</value></data>
+  <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Duration" xml:space="preserve"><value>Duración</value></data>
+  <data name="Metric_TotalHealing" xml:space="preserve"><value>Curación total</value></data>
+  <data name="Metric_DirectHealing" xml:space="preserve"><value>Curación directa</value></data>
+  <data name="Metric_Attacks" xml:space="preserve"><value>Ataques</value></data>
+  <data name="Metric_HitCount" xml:space="preserve"><value>Impactos</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>Habilidades</value></data>
+  <data name="Metric_HealingSkills" xml:space="preserve"><value>Habilidades de curación</value></data>
+  <data name="Metric_ShieldSkills" xml:space="preserve"><value>Habilidades de barrera</value></data>
+  <data name="Metric_HealingHits" xml:space="preserve"><value>Curaciones</value></data>
+  <data name="Metric_ShieldHits" xml:space="preserve"><value>Aplicaciones de barrera</value></data>
+
+  <!-- Short metric names (column headers / metric tiles where space is tight) -->
+  <data name="MetricShort_Damage" xml:space="preserve"><value>Daño</value></data>
+  <data name="MetricShort_Heal" xml:space="preserve"><value>Curación</value></data>
+  <data name="MetricShort_Hot" xml:space="preserve"><value>Curación periódica</value></data>
+  <data name="MetricShort_DrainHeal" xml:space="preserve"><value>Curación por absorción de vida</value></data>
+  <data name="MetricShort_ShieldAbsorbed" xml:space="preserve"><value>Absorbido por la barrera</value></data>
+  <data name="MetricShort_PeriodicDamage" xml:space="preserve"><value>Daño periódico</value></data>
+  <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>Impactos periódicos</value></data>
+
+  <!-- Combat stats (shared between summary tiles and column headers) -->
+  <data name="Stat_Critical" xml:space="preserve"><value>Crítico</value></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>Perforación</value></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>Doble</value></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>Multigolpe</value></data>
+  <data name="Stat_Front" xml:space="preserve"><value>Frontal</value></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>Bloqueo con Arma</value></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>Bloqueo con Arma Perforación</value></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>Tenacidad</value></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>Recuperación</value></data>
+  <data name="Stat_Back" xml:space="preserve"><value>Espalda</value></data>
+  <data name="Stat_Block" xml:space="preserve"><value>Bloqueo con Escudo</value></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>Bloqueo con Escudo Perforación</value></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>Evasión</value></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>Invencibilidad</value></data>
+
+  <!-- UI-specific column headers that don't fit other categories -->
+  <data name="Column_History" xml:space="preserve"><value>Historial</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>Habilidad</value></data>
+  <data name="Column_Direct" xml:space="preserve"><value>Directo</value></data>
+  <data name="Column_Max" xml:space="preserve"><value>Máx.</value></data>
+  <data name="Column_Min" xml:space="preserve"><value>Mín.</value></data>
+  <data name="Column_Average" xml:space="preserve"><value>Media</value></data>
+  <data name="Column_Share" xml:space="preserve"><value>Proporción</value></data>
+  <data name="Column_Events" xml:space="preserve"><value>Eventos</value></data>
+  <data name="Column_Action" xml:space="preserve"><value>Acción</value></data>
+  <data name="Column_Index" xml:space="preserve"><value>Índice</value></data>
+  <data name="Column_Header" xml:space="preserve"><value>Cabecera</value></data>
+  <data name="Column_Evidence" xml:space="preserve"><value>Evidencia</value></data>
+  <data name="Column_Route" xml:space="preserve"><value>Ruta</value></data>
+  <data name="Column_Opcode" xml:space="preserve"><value>Código de operación</value></data>
+  <data name="Column_Opcodes" xml:space="preserve"><value>Códigos de operación</value></data>
+  <data name="Column_HeaderPacket" xml:space="preserve"><value>Paquete de cabecera</value></data>
+  <data name="Column_Packet" xml:space="preserve"><value>Paquete</value></data>
+  <data name="Column_Source" xml:space="preserve"><value>Origen</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>Objetivo</value></data>
+  <data name="Column_Time" xml:space="preserve"><value>Tiempo</value></data>
+  <data name="Column_Value" xml:space="preserve"><value>Valor</value></data>
+  <data name="Column_Effect" xml:space="preserve"><value>Efecto</value></data>
+  <data name="Column_Canonicalization" xml:space="preserve"><value>Canonicalización</value></data>
+  <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>Ordenar por</value></data>
+  <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
+  <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>Daño total</value></data>
+
+  <data name="Playback_WindowTitleFormat" xml:space="preserve"><value>Reproducción (experimental) – {0}</value></data>
+  <data name="Playback_Open" xml:space="preserve"><value>Reproducción</value></data>
+  <data name="Playback_Status_Loading" xml:space="preserve"><value>Cargando fotograma</value></data>
+  <data name="Playback_Status_Playing" xml:space="preserve"><value>Reproduciendo</value></data>
+  <data name="Playback_Status_Paused" xml:space="preserve"><value>En pausa</value></data>
+  <data name="Playback_PreviousEvent" xml:space="preserve"><value>Evento anterior</value></data>
+  <data name="Playback_PreviousSecond" xml:space="preserve"><value>Retroceder 1 segundo</value></data>
+  <data name="Playback_NextSecond" xml:space="preserve"><value>Avanzar 1 segundo</value></data>
+  <data name="Playback_NextEvent" xml:space="preserve"><value>Evento siguiente</value></data>
+  <data name="Playback_Label_Speed" xml:space="preserve"><value>Velocidad</value></data>
+  <data name="Playback_Label_Zoom" xml:space="preserve"><value>Zoom</value></data>
+  <data name="Playback_ZoomIn" xml:space="preserve"><value>Acercar</value></data>
+  <data name="Playback_ZoomOut" xml:space="preserve"><value>Alejar</value></data>
+  <data name="Playback_ZoomReset" xml:space="preserve"><value>Restablecer zoom</value></data>
+  <data name="Playback_SelectCombatant" xml:space="preserve"><value>Selecciona un combatiente para ver sus datos</value></data>
+  <data name="Playback_NoData" xml:space="preserve"><value>No hay datos en esta vista</value></data>
+  <data name="Playback_Combatants" xml:space="preserve"><value>Combatientes</value></data>
+  <data name="Playback_EventWindow" xml:space="preserve"><value>Ventana de eventos</value></data>
+  <data name="Playback_EventScope_All" xml:space="preserve"><value>Todos los eventos</value></data>
+  <data name="Playback_Metric_Count" xml:space="preserve"><value>Cantidad</value></data>
+  <data name="Playback_Metric_Coverage" xml:space="preserve"><value>Cobertura</value></data>
+  <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>Activo</value></data>
+  <data name="Playback_Column_Combatant" xml:space="preserve"><value>Combatiente</value></data>
+  <data name="Playback_Column_Damage" xml:space="preserve"><value>Daño</value></data>
+  <data name="Playback_Column_Healing" xml:space="preserve"><value>Curación</value></data>
+  <data name="Playback_Column_RemainingHp" xml:space="preserve"><value>Puntos de vida restantes</value></data>
+  <data name="Playback_Column_Time" xml:space="preserve"><value>Tiempo</value></data>
+  <data name="Playback_Column_Track" xml:space="preserve"><value>Pista</value></data>
+  <data name="Playback_Column_Source" xml:space="preserve"><value>Origen</value></data>
+  <data name="Playback_Column_Target" xml:space="preserve"><value>Objetivo</value></data>
+  <data name="Playback_Column_Skill" xml:space="preserve"><value>Habilidad</value></data>
+  <data name="Playback_Column_Amount" xml:space="preserve"><value>Cantidad</value></data>
+  <data name="Playback_Track_Combat" xml:space="preserve"><value>Combate</value></data>
+  <data name="Playback_Track_Mechanic" xml:space="preserve"><value>Mecánicas</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>Recurso</value></data>
+  <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>Puntos de vida restantes</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>Ciclo de los efectos</value></data>
+  <data name="Playback_AuraCoverage" xml:space="preserve"><value>Buff / Debuff</value></data>
+  <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>Efecto n.º {0}</value></data>
+  <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>Tipo de efecto</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>Buff</value></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>Debuff</value></data>
+  <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>Desconocido</value></data>
+  <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>Nodo exacto n.º {0}</value></data>
+  <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>Habilidad {0}, ranura {1}</value></data>
+  <data name="Playback_AuraEvidence_AmbiguousFormat" xml:space="preserve"><value>Coincidencia ambigua ({0} candidatos)</value></data>
+  <data name="Playback_AuraEvidence_None" xml:space="preserve"><value>Sin coincidencia semántica</value></data>
+  <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>Aplicar durante {0} ms</value></data>
+  <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>Aplicar</value></data>
+  <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>Renovar</value></data>
+  <data name="Playback_Lifecycle_ResultFormat" xml:space="preserve"><value>Fin ({0})</value></data>
+  <data name="Playback_Track_State" xml:space="preserve"><value>Estado</value></data>
+  <data name="Playback_Track_Scene" xml:space="preserve"><value>Escena</value></data>
+  <data name="Playback_Track_Action" xml:space="preserve"><value>Acción</value></data>
+  <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>Diagnóstico</value></data>
+  <data name="Playback_Track_Other" xml:space="preserve"><value>Otros</value></data>
+  <data name="Playback_Mechanic_HitAttemptFormat" xml:space="preserve"><value>Impactos {0}/{1}</value></data>
+
+  <!-- Battle scene labels (used in archived battle history) -->
+  <data name="Scene_Activation" xml:space="preserve"><value>Inicio de escena</value></data>
+  <data name="Scene_Combat" xml:space="preserve"><value>Escena de combate</value></data>
+  <data name="Scene_Teardown" xml:space="preserve"><value>Fin de escena</value></data>
+  <data name="Scene_Archive" xml:space="preserve"><value>Archivo de escena</value></data>
+  <data name="Scene_Unknown" xml:space="preserve"><value>Escena desconocida</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>Recurso</value></data>
+  <data name="Metric_ManaChange" xml:space="preserve"><value>Cambio de maná</value></data>
+  <data name="Metric_DirectEvents" xml:space="preserve"><value>Eventos directos</value></data>
+  <data name="Metric_PeriodicEvents" xml:space="preserve"><value>Eventos periódicos</value></data>
+  <data name="Metric_ResourceSkills" xml:space="preserve"><value>Habilidades de recursos</value></data>
+  <data name="Metric_ResourceEvents" xml:space="preserve"><value>Eventos de recursos</value></data>
+  <data name="Empty_ResourceEvents" xml:space="preserve"><value>No hay eventos de recursos</value></data>
+</root>

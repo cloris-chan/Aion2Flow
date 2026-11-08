@@ -88,8 +88,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             OverlayInteractionHotkey = null;
         }
 
-        RebuildLanguageOptions();
-        SelectedLanguage = Languages.FirstOrDefault(x => string.Equals(x.Code, _languageService.CurrentLanguage, StringComparison.Ordinal));
+        foreach (var language in LanguageService.SupportedLanguages)
+            Languages.Add(new LanguageOption(language, CultureInfo.GetCultureInfo(language).NativeName));
+        SelectCurrentInterfaceLanguage();
         SelectedClientVersion = _clientSettings.CurrentProfile.Version;
         RebuildResourceLanguageOptions();
 
@@ -638,7 +639,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     private void OnLanguageServiceLanguageChanged(object? sender, string language)
     {
-        Dispatcher.UIThread.Post(RebuildLanguageOptions);
+        Dispatcher.UIThread.Post(SelectCurrentInterfaceLanguage);
     }
 
     private void OnClientChanged(object? sender, ClientProfile profile)
@@ -686,15 +687,8 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     private string ResolveMainMetricVisibilityDisplay(bool isVisible) => Localization[isVisible ? "Settings_MainMetricVisibility_Show" : "Settings_MainMetricVisibility_Hide"];
 
-    private void RebuildLanguageOptions()
-    {
-        var selectedCode = SelectedLanguage?.Code ?? _languageService.CurrentLanguage;
-        Languages.Clear();
-        Languages.Add(new LanguageOption(LanguageService.TraditionalChinese, "繁體中文"));
-        Languages.Add(new LanguageOption(LanguageService.English, "English"));
-        Languages.Add(new LanguageOption(LanguageService.Korean, "한국어"));
-        SelectedLanguage = Languages.FirstOrDefault(x => x.Code == selectedCode) ?? Languages.FirstOrDefault();
-    }
+    private void SelectCurrentInterfaceLanguage()
+        => SelectedLanguage = Languages.First(option => option.Code == _languageService.CurrentLanguage);
 
     private void RebuildResourceLanguageOptions()
     {

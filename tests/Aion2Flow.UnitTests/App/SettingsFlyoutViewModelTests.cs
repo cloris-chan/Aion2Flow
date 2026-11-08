@@ -31,13 +31,16 @@ public sealed class SettingsFlyoutViewModelTests
         var viewModel = fixture.ViewModel;
         Assert.Equal(LanguageService.English, viewModel.SelectedLanguage?.Code);
         Assert.Equal(LanguageService.TraditionalChinese, viewModel.SelectedResourceLanguage?.Code);
-        viewModel.SelectedLanguage = viewModel.Languages.Single(option => option.Code == LanguageService.Korean);
+        const string japanese = "ja-JP";
+        Assert.DoesNotContain(viewModel.ResourceLanguages, option => option.Code == japanese);
+        viewModel.SelectedLanguage = viewModel.Languages.Single(option => option.Code == japanese);
+        Assert.Equal("設定", viewModel.Localization["Settings_Title"]);
         Assert.Equal(LanguageService.TraditionalChinese, viewModel.SelectedResourceLanguage?.Code);
         viewModel.SelectedResourceLanguage = viewModel.ResourceLanguages.Single(option => option.Code == LanguageService.English);
-        Assert.Equal(LanguageService.Korean, viewModel.SelectedLanguage?.Code);
+        Assert.Equal(japanese, viewModel.SelectedLanguage?.Code);
 
         var persisted = new SettingsService(fixture.SettingsPath).Current;
-        Assert.Equal(LanguageService.Korean, persisted.Language);
+        Assert.Equal(japanese, persisted.Language);
         Assert.Equal(LanguageService.English, persisted.ResourceLanguage);
     }
 

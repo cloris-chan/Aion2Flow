@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- Action -->
+  <data name="Action_BattleReset" xml:space="preserve"><value>戦闘をリセット</value></data>
+  <data name="Action_Live" xml:space="preserve"><value>ライブ</value></data>
+  <data name="Action_SelectAll" xml:space="preserve"><value>すべて選択</value></data>
+  <data name="Action_Close" xml:space="preserve"><value>閉じる</value></data>
+
+  <!-- Settings -->
+  <data name="Settings_Title" xml:space="preserve"><value>設定</value></data>
+  <data name="Settings_Topmost" xml:space="preserve"><value>最前面表示</value></data>
+  <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>ゲームが前面にあるとき</value></data>
+  <data name="Settings_Topmost_Always" xml:space="preserve"><value>常に</value></data>
+  <data name="Settings_Topmost_Never" xml:space="preserve"><value>最前面にしない</value></data>
+  <data name="Settings_SceneKind" xml:space="preserve"><value>シーンモード</value></data>
+  <data name="Settings_SceneKind_Standard" xml:space="preserve"><value>標準</value></data>
+  <data name="Settings_SceneKind_Boss" xml:space="preserve"><value>ボス戦のみ</value></data>
+  <data name="Settings_MainMetricVisibility" xml:space="preserve"><value>メイン画面の表示項目</value></data>
+  <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>DPS列</value></data>
+  <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>合計ダメージ列</value></data>
+  <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>下部の合計DPS</value></data>
+  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>表示</value></data>
+  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>非表示</value></data>
+  <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>時間の表示形式</value></data>
+  <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
+  <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
+  <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>数値を短縮</value></data>
+  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>オン</value></data>
+  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>オフ</value></data>
+  <data name="Settings_FocusStatusBar" xml:space="preserve"><value>対象ステータスバー</value></data>
+  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>オン</value></data>
+  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>オフ</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>クリックスルー時のタイトルバー</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>非表示</value></data>
+  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>表示</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>名前の表示</value></data>
+  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>表示</value></data>
+  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>非表示</value></data>
+  <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>プレイヤー名</value></data>
+  <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>自分のマーク</value></data>
+  <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>オフ</value></data>
+  <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>名前が非表示のとき</value></data>
+  <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>常に</value></data>
+  <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>サーバー名</value></data>
+  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>表示</value></data>
+  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>非表示</value></data>
+  <data name="Settings_PlayerLegionName" xml:space="preserve"><value>レギオン名</value></data>
+  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>表示</value></data>
+  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>非表示</value></data>
+  <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>種族別の色</value></data>
+  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>オン</value></data>
+  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>オフ</value></data>
+  <data name="Settings_SkillMonitor" xml:space="preserve"><value>スキルモニター</value></data>
+  <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>有効にする</value></data>
+  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>スキルモニター設定</value></data>
+  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>オン</value></data>
+  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>オフ</value></data>
+  <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>すべて選択</value></data>
+  <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>すべて解除</value></data>
+  <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>バフ持続時間</value></data>
+  <data name="Settings_SkillMonitor_CooldownDisplay" xml:space="preserve"><value>再使用時間</value></data>
+  <data name="Settings_SkillMonitor_BuffColumn" xml:space="preserve"><value>バフ</value></data>
+  <data name="Settings_SkillMonitor_CooldownColumn" xml:space="preserve"><value>再使用時間</value></data>
+  <data name="Settings_SkillMonitor_BuffSelectedFormat" xml:space="preserve"><value>バフ {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_CooldownSelectedFormat" xml:space="preserve"><value>再使用時間 {0}/{1}</value></data>
+  <data name="Settings_SkillMonitor_Scale" xml:space="preserve"><value>モニターの拡大率</value></data>
+  <data name="Settings_VisibleRows" xml:space="preserve"><value>表示行数</value></data>
+  <data name="Settings_CombatantStatisticsScope" xml:space="preserve"><value>集計対象</value></data>
+  <data name="Settings_CombatantStatisticsScope_Self" xml:space="preserve"><value>自分のみ</value></data>
+  <data name="Settings_CombatantStatisticsScope_Party" xml:space="preserve"><value>パーティー</value></data>
+  <data name="Settings_CombatantStatisticsScope_Force" xml:space="preserve"><value>フォース</value></data>
+  <data name="Settings_CombatantStatisticsScope_All" xml:space="preserve"><value>全員</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>表示言語</value></data>
+  <data name="Settings_ClientVersion" xml:space="preserve"><value>ゲームクライアント</value></data>
+  <data name="Settings_ClientVersion_ChangeHint" xml:space="preserve"><value>切り替えると現在のシーンが自動で記録され、選択したゲームクライアントが適用されます。</value></data>
+  <data name="Settings_ClientVersion_Purple" xml:space="preserve"><value>PURPLE（韓国／台湾）</value></data>
+  <data name="Settings_ClientVersion_Steam" xml:space="preserve"><value>Steam</value></data>
+  <data name="Settings_ResourceLanguage" xml:space="preserve"><value>ゲームデータの言語</value></data>
+  <data name="Settings_UiScale" xml:space="preserve"><value>UIの拡大率</value></data>
+  <data name="Settings_Hotkey_BattleReset" xml:space="preserve"><value>戦闘リセットのショートカット</value></data>
+  <data name="Settings_DisplayModeHotkey" xml:space="preserve"><value>表示モードのショートカット</value></data>
+  <data name="Settings_Hotkey_None" xml:space="preserve"><value>なし</value></data>
+  <data name="Settings_Hotkey_PressKeys" xml:space="preserve"><value>キーを押してください…</value></data>
+  <data name="Settings_Hotkey_RegistrationUnavailable" xml:space="preserve"><value>ショートカットを登録できません。別のキーの組み合わせを選んでください。</value></data>
+  <data name="Settings_Hotkey_Clear" xml:space="preserve"><value>ショートカットを解除</value></data>
+  <data name="Overlay_Action_EnableClickThrough" xml:space="preserve"><value>クリックスルーを有効にする</value></data>
+  <data name="Overlay_Action_Hide" xml:space="preserve"><value>オーバーレイを非表示にする</value></data>
+  <data name="Overlay_Action_Restore" xml:space="preserve"><value>オーバーレイを再表示する</value></data>
+  <data name="SkillMonitor_Title" xml:space="preserve"><value>スキルモニター</value></data>
+  <data name="SkillMonitor_Buffs" xml:space="preserve"><value>バフ</value></data>
+  <data name="SkillMonitor_Cooldowns" xml:space="preserve"><value>再使用時間</value></data>
+  <data name="SkillMonitor_Indefinite" xml:space="preserve"><value>∞</value></data>
+  <data name="SkillMonitor_UnknownSkill" xml:space="preserve"><value>未特定のスキル</value></data>
+  <data name="Settings_Update_Check" xml:space="preserve"><value>更新を確認</value></data>
+  <data name="Settings_Update_Restart" xml:space="preserve"><value>再起動して更新</value></data>
+  <data name="Settings_Update_Checking" xml:space="preserve"><value>更新を確認中…</value></data>
+  <data name="Settings_Update_DownloadingFormat" xml:space="preserve"><value>ダウンロード中… {0}%</value></data>
+  <data name="Settings_Update_UpToDate" xml:space="preserve"><value>最新版です</value></data>
+  <data name="Settings_Update_ReadyFormat" xml:space="preserve"><value>更新 {0} の準備ができました。適用するには再起動してください。</value></data>
+  <data name="Settings_Update_Failed" xml:space="preserve"><value>更新に失敗しました</value></data>
+  <data name="Settings_Update_CurrentVersionFormat" xml:space="preserve"><value>v{0}</value></data>
+
+  <!-- Status -->
+  <data name="Status_Ready" xml:space="preserve"><value>準備完了</value></data>
+  <data name="Status_DriverReady" xml:space="preserve"><value>WinDivert は動作中です</value></data>
+  <data name="Status_DriverIdle" xml:space="preserve"><value>WinDivert は停止中です</value></data>
+  <data name="Status_PortReady" xml:space="preserve"><value>ゲームのポートを検出しました</value></data>
+  <data name="Status_PortWaiting" xml:space="preserve"><value>ゲームのポートを待機中</value></data>
+  <data name="Status_PortIdle" xml:space="preserve"><value>ゲームのポート監視は停止中です</value></data>
+  <data name="Status_Locked" xml:space="preserve"><value>戦闘接続を捕捉済み</value></data>
+  <data name="Status_Unlocked" xml:space="preserve"><value>戦闘接続を待機中</value></data>
+  <data name="Status_LatencyMeasured" xml:space="preserve"><value>ゲームサーバーとの往復遅延</value></data>
+  <data name="Status_LatencyUnavailable" xml:space="preserve"><value>遅延の測定値はまだありません</value></data>
+
+  <!-- Direction (Outgoing/Incoming and their counterpart aliases) -->
+  <data name="Direction_Outgoing" xml:space="preserve"><value>与えた</value></data>
+  <data name="Direction_Incoming" xml:space="preserve"><value>受けた</value></data>
+  <data name="Direction_Targets" xml:space="preserve"><value>対象</value></data>
+  <data name="Direction_Sources" xml:space="preserve"><value>発生元</value></data>
+
+  <!-- Combat category -->
+  <data name="Category_Damage" xml:space="preserve"><value>ダメージ</value></data>
+  <data name="Category_Healing" xml:space="preserve"><value>回復</value></data>
+  <data name="Category_Shield" xml:space="preserve"><value>バリア</value></data>
+
+  <!-- Empty-state placeholders -->
+  <data name="Empty_History" xml:space="preserve"><value>戦闘記録がありません</value></data>
+  <data name="Empty_Combatants" xml:space="preserve"><value>戦闘データがありません</value></data>
+  <data name="Empty_Skills" xml:space="preserve"><value>スキルデータがありません</value></data>
+  <data name="Skill_UnknownEffect" xml:space="preserve"><value>不明な効果</value></data>
+  <data name="PlayerName_AnonymousPlayer" xml:space="preserve"><value>プレイヤー</value></data>
+  <data name="CharacterClass_Gladiator" xml:space="preserve"><value>グラディエーター</value></data>
+  <data name="CharacterClass_Templar" xml:space="preserve"><value>テンプラー</value></data>
+  <data name="CharacterClass_Assassin" xml:space="preserve"><value>アサシン</value></data>
+  <data name="CharacterClass_Ranger" xml:space="preserve"><value>レンジャー</value></data>
+  <data name="CharacterClass_Sorcerer" xml:space="preserve"><value>ソーサラー</value></data>
+  <data name="CharacterClass_Elementalist" xml:space="preserve"><value>スピリットマスター</value></data>
+  <data name="CharacterClass_Cleric" xml:space="preserve"><value>クレリック</value></data>
+  <data name="CharacterClass_Chanter" xml:space="preserve"><value>チャンター</value></data>
+  <data name="CharacterClass_Brawler" xml:space="preserve"><value>ファイター</value></data>
+
+  <!-- Aggregate metrics (full names, used as labels and table headers) -->
+  <data name="Metric_Total" xml:space="preserve"><value>合計</value></data>
+  <data name="Metric_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Metric_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Metric_Duration" xml:space="preserve"><value>時間</value></data>
+  <data name="Metric_TotalHealing" xml:space="preserve"><value>総回復量</value></data>
+  <data name="Metric_DirectHealing" xml:space="preserve"><value>直接回復</value></data>
+  <data name="Metric_Attacks" xml:space="preserve"><value>攻撃回数</value></data>
+  <data name="Metric_HitCount" xml:space="preserve"><value>ヒット数</value></data>
+  <data name="Metric_Skills" xml:space="preserve"><value>スキル</value></data>
+  <data name="Metric_HealingSkills" xml:space="preserve"><value>回復スキル</value></data>
+  <data name="Metric_ShieldSkills" xml:space="preserve"><value>バリアスキル</value></data>
+  <data name="Metric_HealingHits" xml:space="preserve"><value>回復回数</value></data>
+  <data name="Metric_ShieldHits" xml:space="preserve"><value>バリア付与回数</value></data>
+
+  <!-- Short metric names (column headers / metric tiles where space is tight) -->
+  <data name="MetricShort_Damage" xml:space="preserve"><value>ダメージ</value></data>
+  <data name="MetricShort_Heal" xml:space="preserve"><value>回復</value></data>
+  <data name="MetricShort_Hot" xml:space="preserve"><value>持続回復</value></data>
+  <data name="MetricShort_DrainHeal" xml:space="preserve"><value>HP吸収</value></data>
+  <data name="MetricShort_ShieldAbsorbed" xml:space="preserve"><value>バリア吸収量</value></data>
+  <data name="MetricShort_PeriodicDamage" xml:space="preserve"><value>持続ダメージ</value></data>
+  <data name="MetricShort_PeriodicHits" xml:space="preserve"><value>持続ヒット数</value></data>
+
+  <!-- Combat stats (shared between summary tiles and column headers) -->
+  <data name="Stat_Critical" xml:space="preserve"><value>クリティカル</value></data>
+  <data name="Stat_Perfect" xml:space="preserve"><value>完璧</value></data>
+  <data name="Stat_Smite" xml:space="preserve"><value>強打</value></data>
+  <data name="Stat_MultiHit" xml:space="preserve"><value>多段ヒット</value></data>
+  <data name="Stat_Front" xml:space="preserve"><value>前方</value></data>
+  <data name="Stat_Parry" xml:space="preserve"><value>武器ガード</value></data>
+  <data name="Stat_PerfectParry" xml:space="preserve"><value>完璧武器ガード</value></data>
+  <data name="Stat_Endurance" xml:space="preserve"><value>鉄壁</value></data>
+  <data name="Stat_Regeneration" xml:space="preserve"><value>再生</value></data>
+  <data name="Stat_Back" xml:space="preserve"><value>後方</value></data>
+  <data name="Stat_Block" xml:space="preserve"><value>シールド ガード</value></data>
+  <data name="Stat_PerfectBlock" xml:space="preserve"><value>完璧シールド ガード</value></data>
+  <data name="Stat_Evade" xml:space="preserve"><value>回避</value></data>
+  <data name="Stat_Invincible" xml:space="preserve"><value>無敵</value></data>
+
+  <!-- UI-specific column headers that don't fit other categories -->
+  <data name="Column_History" xml:space="preserve"><value>記録</value></data>
+  <data name="Column_Skill" xml:space="preserve"><value>スキル</value></data>
+  <data name="Column_Direct" xml:space="preserve"><value>直接</value></data>
+  <data name="Column_Max" xml:space="preserve"><value>最大</value></data>
+  <data name="Column_Min" xml:space="preserve"><value>最小</value></data>
+  <data name="Column_Average" xml:space="preserve"><value>平均</value></data>
+  <data name="Column_Share" xml:space="preserve"><value>割合</value></data>
+  <data name="Column_Events" xml:space="preserve"><value>イベント</value></data>
+  <data name="Column_Action" xml:space="preserve"><value>アクション</value></data>
+  <data name="Column_Index" xml:space="preserve"><value>インデックス</value></data>
+  <data name="Column_Header" xml:space="preserve"><value>ヘッダー</value></data>
+  <data name="Column_Evidence" xml:space="preserve"><value>根拠</value></data>
+  <data name="Column_Route" xml:space="preserve"><value>経路</value></data>
+  <data name="Column_Opcode" xml:space="preserve"><value>オペコード</value></data>
+  <data name="Column_Opcodes" xml:space="preserve"><value>オペコード</value></data>
+  <data name="Column_HeaderPacket" xml:space="preserve"><value>ヘッダーパケット</value></data>
+  <data name="Column_Packet" xml:space="preserve"><value>パケット</value></data>
+  <data name="Column_Source" xml:space="preserve"><value>発生元</value></data>
+  <data name="Column_Target" xml:space="preserve"><value>対象</value></data>
+  <data name="Column_Time" xml:space="preserve"><value>時刻</value></data>
+  <data name="Column_Value" xml:space="preserve"><value>値</value></data>
+  <data name="Column_Effect" xml:space="preserve"><value>効果</value></data>
+  <data name="Column_Canonicalization" xml:space="preserve"><value>正規化</value></data>
+  <data name="Settings_CombatantSortMetric" xml:space="preserve"><value>並べ替え</value></data>
+  <data name="Settings_CombatantSortMetric_DamagePerSecond" xml:space="preserve"><value>DPS</value></data>
+  <data name="Settings_CombatantSortMetric_TotalDamage" xml:space="preserve"><value>総ダメージ量</value></data>
+
+  <data name="Playback_WindowTitleFormat" xml:space="preserve"><value>再生（試験機能）– {0}</value></data>
+  <data name="Playback_Open" xml:space="preserve"><value>再生</value></data>
+  <data name="Playback_Status_Loading" xml:space="preserve"><value>フレームを読み込み中</value></data>
+  <data name="Playback_Status_Playing" xml:space="preserve"><value>再生中</value></data>
+  <data name="Playback_Status_Paused" xml:space="preserve"><value>一時停止中</value></data>
+  <data name="Playback_PreviousEvent" xml:space="preserve"><value>前のイベント</value></data>
+  <data name="Playback_PreviousSecond" xml:space="preserve"><value>1秒戻る</value></data>
+  <data name="Playback_NextSecond" xml:space="preserve"><value>1秒進む</value></data>
+  <data name="Playback_NextEvent" xml:space="preserve"><value>次のイベント</value></data>
+  <data name="Playback_Label_Speed" xml:space="preserve"><value>速度</value></data>
+  <data name="Playback_Label_Zoom" xml:space="preserve"><value>拡大率</value></data>
+  <data name="Playback_ZoomIn" xml:space="preserve"><value>拡大</value></data>
+  <data name="Playback_ZoomOut" xml:space="preserve"><value>縮小</value></data>
+  <data name="Playback_ZoomReset" xml:space="preserve"><value>拡大率をリセット</value></data>
+  <data name="Playback_SelectCombatant" xml:space="preserve"><value>確認する戦闘参加者を選択してください</value></data>
+  <data name="Playback_NoData" xml:space="preserve"><value>この表示にデータがありません</value></data>
+  <data name="Playback_Combatants" xml:space="preserve"><value>戦闘参加者</value></data>
+  <data name="Playback_EventWindow" xml:space="preserve"><value>イベント範囲</value></data>
+  <data name="Playback_EventScope_All" xml:space="preserve"><value>すべてのイベント</value></data>
+  <data name="Playback_Metric_Count" xml:space="preserve"><value>回数</value></data>
+  <data name="Playback_Metric_Coverage" xml:space="preserve"><value>効果時間の割合</value></data>
+  <data name="Playback_Metric_ActiveTime" xml:space="preserve"><value>有効時間</value></data>
+  <data name="Playback_Column_Combatant" xml:space="preserve"><value>戦闘参加者</value></data>
+  <data name="Playback_Column_Damage" xml:space="preserve"><value>ダメージ</value></data>
+  <data name="Playback_Column_Healing" xml:space="preserve"><value>回復</value></data>
+  <data name="Playback_Column_RemainingHp" xml:space="preserve"><value>残りHP</value></data>
+  <data name="Playback_Column_Time" xml:space="preserve"><value>時刻</value></data>
+  <data name="Playback_Column_Track" xml:space="preserve"><value>トラック</value></data>
+  <data name="Playback_Column_Source" xml:space="preserve"><value>発生元</value></data>
+  <data name="Playback_Column_Target" xml:space="preserve"><value>対象</value></data>
+  <data name="Playback_Column_Skill" xml:space="preserve"><value>スキル</value></data>
+  <data name="Playback_Column_Amount" xml:space="preserve"><value>量</value></data>
+  <data name="Playback_Track_Combat" xml:space="preserve"><value>戦闘</value></data>
+  <data name="Playback_Track_Mechanic" xml:space="preserve"><value>戦闘メカニクス</value></data>
+  <data name="Playback_Track_Resource" xml:space="preserve"><value>資源</value></data>
+  <data name="Playback_Track_RemainingHp" xml:space="preserve"><value>残りHP</value></data>
+  <data name="Playback_Track_Aura" xml:space="preserve"><value>効果の経過</value></data>
+  <data name="Playback_AuraCoverage" xml:space="preserve"><value>バフ／デバフ</value></data>
+  <data name="Playback_AuraUnknownFormat" xml:space="preserve"><value>効果 #{0}</value></data>
+  <data name="Playback_AuraDisposition_Label" xml:space="preserve"><value>効果の分類</value></data>
+  <data name="Playback_AuraDisposition_Buff" xml:space="preserve"><value>バフ</value></data>
+  <data name="Playback_AuraDisposition_Debuff" xml:space="preserve"><value>デバフ</value></data>
+  <data name="Playback_AuraDisposition_Unknown" xml:space="preserve"><value>不明</value></data>
+  <data name="Playback_AuraEvidence_ExactNodeFormat" xml:space="preserve"><value>ノード #{0} に一致</value></data>
+  <data name="Playback_AuraEvidence_UnambiguousSlotFormat" xml:space="preserve"><value>スキル {0} のスロット {1}</value></data>
+  <data name="Playback_AuraEvidence_AmbiguousFormat" xml:space="preserve"><value>候補が {0} 件あり特定できません</value></data>
+  <data name="Playback_AuraEvidence_None" xml:space="preserve"><value>効果の意味を特定できません</value></data>
+  <data name="Playback_Lifecycle_OpenFormat" xml:space="preserve"><value>付与（{0}ミリ秒）</value></data>
+  <data name="Playback_Lifecycle_OpenIndefinite" xml:space="preserve"><value>付与</value></data>
+  <data name="Playback_Lifecycle_Renew" xml:space="preserve"><value>更新</value></data>
+  <data name="Playback_Lifecycle_ResultFormat" xml:space="preserve"><value>終了（{0}）</value></data>
+  <data name="Playback_Track_State" xml:space="preserve"><value>状態</value></data>
+  <data name="Playback_Track_Scene" xml:space="preserve"><value>シーン</value></data>
+  <data name="Playback_Track_Action" xml:space="preserve"><value>アクション</value></data>
+  <data name="Playback_Track_Diagnostic" xml:space="preserve"><value>診断</value></data>
+  <data name="Playback_Track_Other" xml:space="preserve"><value>その他</value></data>
+  <data name="Playback_Mechanic_HitAttemptFormat" xml:space="preserve"><value>ヒット {0}/{1}</value></data>
+
+  <!-- Battle scene labels (used in archived battle history) -->
+  <data name="Scene_Activation" xml:space="preserve"><value>シーン開始</value></data>
+  <data name="Scene_Combat" xml:space="preserve"><value>戦闘シーン</value></data>
+  <data name="Scene_Teardown" xml:space="preserve"><value>シーン終了</value></data>
+  <data name="Scene_Archive" xml:space="preserve"><value>シーンの記録</value></data>
+  <data name="Scene_Unknown" xml:space="preserve"><value>不明なシーン</value></data>
+  <data name="Category_Resource" xml:space="preserve"><value>資源</value></data>
+  <data name="Metric_ManaChange" xml:space="preserve"><value>MP変動</value></data>
+  <data name="Metric_DirectEvents" xml:space="preserve"><value>直接イベント</value></data>
+  <data name="Metric_PeriodicEvents" xml:space="preserve"><value>持続イベント</value></data>
+  <data name="Metric_ResourceSkills" xml:space="preserve"><value>資源スキル</value></data>
+  <data name="Metric_ResourceEvents" xml:space="preserve"><value>資源イベント</value></data>
+  <data name="Empty_ResourceEvents" xml:space="preserve"><value>資源イベントがありません</value></data>
+</root>
