@@ -6,12 +6,12 @@ internal static class ResourcePackManifest
 {
     public static IReadOnlyList<ResourceSetDescriptor> Sets { get; } = Array.AsReadOnly<ResourceSetDescriptor>(
     [
-        new("purple", "21b9a2574dc1b915e1fef87e322de2d2415d5561f0ab8f5bfc4495544b36f056", "en-US", 164,
-            new("Cloris.Aion2Flow.Resources.Packs.purple.shared.bin", 2982487, 6895710745890810211UL),
+        new("purple", "afd17cbbde24ac03b2edad1c69a39e85a6f9fffd0b53b01e4528992f7499e9df", "en-US", 93,
+            new("Cloris.Aion2Flow.Resources.Packs.purple.shared.bin", 2982487, 8420135885003519887UL),
             [
-                new("en-US", "Cloris.Aion2Flow.Resources.Packs.purple.en-US.bin", 705231, 4643195002797143478UL),
-                new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.purple.ko-KR.bin", 762511, 14664516227839058362UL),
-                new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.purple.zh-TW.bin", 713400, 11495344751303620258UL),
+                new("en-US", "Cloris.Aion2Flow.Resources.Packs.purple.en-US.bin", 705829, 184102205626138821UL),
+                new("ko-KR", "Cloris.Aion2Flow.Resources.Packs.purple.ko-KR.bin", 763137, 8853120138263115137UL),
+                new("zh-TW", "Cloris.Aion2Flow.Resources.Packs.purple.zh-TW.bin", 713968, 15178002117978410775UL),
             ], SkillIconCatalog_purple.ResolveAssetName),
         new("steam", "c2ff19e30dbe3b2cdcc89aa57d6761f8786dd4451375ac95927a8c2761a9a3cc", "en-US", 200,
             new("Cloris.Aion2Flow.Resources.Packs.steam.shared.bin", 2684081, 9933806750674850944UL),

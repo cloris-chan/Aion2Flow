@@ -291,6 +291,16 @@ public sealed class ResourcePackTests
         => Assert.Equal(expectedName, ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).ResolveMapName(mapId));
 
     [Theory]
+    [InlineData("en-US", 501u, "Estate Indoors")]
+    [InlineData("en-US", 550u, "Island Estate")]
+    [InlineData("ko-KR", 501u, "영지 실내")]
+    [InlineData("ko-KR", 550u, "영지 섬")]
+    [InlineData("zh-TW", 501u, "領地室內")]
+    [InlineData("zh-TW", 550u, "領地島")]
+    public void Maps_Resolve_Housing_Names_From_The_Selected_Client_Locale(string language, uint mapId, string expectedName)
+        => Assert.Equal(expectedName, ResourceCatalog.Load(ClientProfiles.Purple, language).ResolveMapName(mapId));
+
+    [Theory]
     [InlineData(ResourceLanguage.English, 1001, "Siel", "SIE")]
     [InlineData(ResourceLanguage.TraditionalChinese, 1001, "希埃爾", "希埃爾")]
     [InlineData(ResourceLanguage.TraditionalChinese, 2001, "伊斯拉佩爾", "伊斯")]

@@ -1,32 +1,32 @@
 {
   "Id": "purple",
-  "Revision": "21b9a2574dc1b915e1fef87e322de2d2415d5561f0ab8f5bfc4495544b36f056",
+  "Revision": "afd17cbbde24ac03b2edad1c69a39e85a6f9fffd0b53b01e4528992f7499e9df",
   "DefaultLanguage": "en-US",
-  "StringMask": 164,
+  "StringMask": 93,
   "Shared": {
     "Language": "",
     "ResourceName": "Cloris.Aion2Flow.Resources.Packs.purple.shared.bin",
     "UncompressedLength": 2982487,
-    "Checksum": 6895710745890810211
+    "Checksum": 8420135885003519887
   },
   "Locales": [
     {
       "Language": "en-US",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.purple.en-US.bin",
-      "UncompressedLength": 705231,
-      "Checksum": 4643195002797143478
+      "UncompressedLength": 705829,
+      "Checksum": 184102205626138821
     },
     {
       "Language": "ko-KR",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.purple.ko-KR.bin",
-      "UncompressedLength": 762511,
-      "Checksum": 14664516227839058362
+      "UncompressedLength": 763137,
+      "Checksum": 8853120138263115137
     },
     {
       "Language": "zh-TW",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.purple.zh-TW.bin",
-      "UncompressedLength": 713400,
-      "Checksum": 11495344751303620258
+      "UncompressedLength": 713968,
+      "Checksum": 15178002117978410775
     }
   ]
 }
