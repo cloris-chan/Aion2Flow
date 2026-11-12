@@ -1,28 +1,28 @@
 {
   "ResourceSetId": "purple",
-  "Rows": 747,
-  "MapKeyRows": 372,
-  "SubzoneKeyRows": 73,
+  "Rows": 870,
+  "MapKeyRows": 430,
+  "SubzoneKeyRows": 93,
   "Locales": [
     {
       "Language": "en-US",
-      "VerifiedNames": 214,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
-      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
     },
     {
       "Language": "ko-KR",
-      "VerifiedNames": 214,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
-      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
     },
     {
       "Language": "zh-TW",
-      "VerifiedNames": 214,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
-      "RowsWithoutAliasDefinition": 273,
+      "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
     }
   ]

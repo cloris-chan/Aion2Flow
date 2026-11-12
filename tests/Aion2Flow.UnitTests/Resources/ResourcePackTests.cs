@@ -19,9 +19,9 @@ public sealed class ResourcePackTests
 
         Assert.Same(shared, snapshot.Shared);
         Assert.Equal(language, snapshot.Language);
-        Assert.Equal(16_056, snapshot.SkillDefinitions.Count);
-        Assert.Equal(16_056, snapshot.Skills.Count);
-        Assert.Equal(13_030, snapshot.NpcCatalog.Count);
+        Assert.Equal(16_607, snapshot.SkillDefinitions.Count);
+        Assert.Equal(16_607, snapshot.Skills.Count);
+        Assert.Equal(14_421, snapshot.NpcCatalog.Count);
         Assert.True(snapshot.Maps.Count > 600);
         Assert.True(snapshot.ServerNames.Count > 100);
     }
@@ -137,8 +137,8 @@ public sealed class ResourcePackTests
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
 
-        Assert.Equal(16_909, runtime.SkillCount);
-        Assert.Equal(26_666, runtime.SlotCount);
+        Assert.Equal(17_467, runtime.SkillCount);
+        Assert.Equal(27_678, runtime.SlotCount);
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
@@ -160,6 +160,9 @@ public sealed class ResourcePackTests
     [InlineData(50_030_103u)]
     [InlineData(1_111_000_022u)]
     [InlineData(1_308_000_015u)]
+    [InlineData(50_020_103u)]
+    [InlineData(50_020_906u)]
+    [InlineData(50_021_506u)]
     public void RuntimeSemanticIndex_Classifies_Current_NonQuantified_Abnormal_Effects(uint resourceId)
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
@@ -169,6 +172,19 @@ public sealed class ResourcePackTests
         Assert.Equal(SkillQuantifiedFacet.None, resolution.DirectSemantics.QuantifiedFacets);
         Assert.Equal(SkillAuraFacet.None, resolution.DirectSemantics.AuraFacets);
         Assert.Equal(SkillSemanticKnowledge.KnownNonQuantified, resolution.DirectSemantics.Knowledge);
+    }
+
+    [Theory]
+    [InlineData(94_031u)]
+    [InlineData(1_600_999_911u)]
+    [InlineData(1_629_000_411u)]
+    public void RuntimeSemanticIndex_Classifies_Summon_Despawn_As_NonQuantified(uint resourceId)
+    {
+        var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
+
+        Assert.True(runtime.TryResolveDirectResourceReference(resourceId, 0, out var resolution));
+        Assert.Equal(SkillSemanticResourceNodeKind.SkillEffect, resolution.NodeKind);
+        Assert.Equal(SkillSemanticValue.KnownNonQuantified, resolution.DirectSemantics);
     }
 
     [Fact]
@@ -276,7 +292,7 @@ public sealed class ResourcePackTests
 
     [Theory]
     [InlineData(ResourceLanguage.English, 1001, "Siel", "SIE")]
-    [InlineData(ResourceLanguage.TraditionalChinese, 1001, "希埃爾", "希埃")]
+    [InlineData(ResourceLanguage.TraditionalChinese, 1001, "希埃爾", "希埃爾")]
     [InlineData(ResourceLanguage.TraditionalChinese, 2001, "伊斯拉佩爾", "伊斯")]
     public void ServerNames_Resolve_ServerName_Dat_Names(string language, int code, string expectedServerName, string expectedShortServerName)
     {

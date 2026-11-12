@@ -10,7 +10,7 @@ internal sealed class SkillSemanticValueIndex
     private static readonly FrozenSet<string> KnownNonQuantifiedEffectTypes = new[]
     {
         "Abnormal", "Abnormal_Cc", "Abnormal_Passive", "Abnormal_True", "AggroTransfer", "APBurn", "APHeal", "APHealRatio",
-        "CasterSkill", "CombatExpCharge_Item", "DecreaseCooltime", "Despawn", "Dispel", "Dispel_Cc", "Dispel_True", "DpHeal",
+        "CasterSkill", "CombatExpCharge_Item", "DecreaseCooltime", "Despawn", "DespawnChild", "Dispel", "Dispel_Cc", "Dispel_True", "DpHeal",
         "DpHeal_Item", "DpHealRatio", "DpHealRatio_Item", "ExchangeResource", "ExpCharge_Item", "Explode_Dot", "FpHeal", "FpHeal_Item",
         "FpHealRatio", "FpHealRatio_Item", "GaugeDecrease", "GaugeIncrease", "GroggyAttackCountDecreasePoint", "GroggyAttackCountIncreasePoint",
         "GroggyGuardDecreaseEnergy", "GroggyGuardIncreaseEnergy", "IncreaseCooltime", "IncreaseDp", "MPBurn", "MPBurnRatio", "MpHeal", "MpHeal_Item", "MpHealRatio",
@@ -39,7 +39,9 @@ internal sealed class SkillSemanticValueIndex
         "IgnorePenaltyLoss_Item_PvE", "IgnorePenaltyLoss_Item_PvP", "ImmuneAbnormal", "ImmuneBind", "ImmuneDecreaseHP",
         "ImmuneGroggyGuardDecreaseEnergy", "ImmuneSkill", "ImmuneSkillEffectGroup", "KillZone", "KiskBlock", "KnockdownInstant", "Loophole",
         "Mimic", "Mot", "Mot_Item", "Mot_Ratio", "MotRatio_Item", "Move_CannotUseSkill", "Move_CanUseSkill", "NoEffect", "None",
-        "OnExpireAbnormal", "OnGlide", "OnLanding", "Oot", "Oot_Item", "Oot_Ratio", "OotRatio_Item", "OverrideIconType", "Paralysis",
+        "OnExpireAbnormal", "OnGlide", "OnLanding", "Oot", "Oot_Item", "Oot_Ratio", "OotRatio_Item",
+        "Outland01", "Outland02", "Outland03", "Outland04", "Outland05", "Outland06", "Outland07", "Outland08", "Outland09",
+        "OverrideIconType", "Paralysis",
         "PetPolymorph", "Poison", "Polymorph", "Polymorph_CannotMove", "Racing", "ReverseMove", "RiftBlock", "Rotate", "Silence",
         "SkillProxy", "SkillTransform", "Sleep", "Slow", "Snare", "SoftMove", "SoftMoveDot", "Sot", "Sot_Item", "Sot_Ratio",
         "SotRatio_Item", "StanceCriticalDamage", "StanceMissDamage", "StanceShieldBlock", "StanceWeaponBlock", "StatChange", "StatConvert",
