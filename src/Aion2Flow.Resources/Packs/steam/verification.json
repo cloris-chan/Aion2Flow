@@ -9,65 +9,65 @@
       "Language": "en-US",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "6db0c40af8f9231c65315e5e9359f1bebe97ae3d0af091fc8f1422f16749af3a"
+      "Sha256": "086ef32791fff343a06e2c8f4749a41f9a9d5661aeb8315750d1bff3ec2c4876"
     },
     {
       "Language": "ko-KR",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "3074f3a958663592b87af3f0c21306c5349887da9ef16ce815f20473d6ee1f90"
+      "Sha256": "766dd2a190a9a297fffe790217e1227d8822f9d6c4a2d5861c7c141d883d7f23"
     },
     {
       "Language": "ja-JP",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "de3305494271a8b80994a24de181f6cca9aecc4468e1778558a61e3da4cfe860"
+      "Sha256": "62076386b2844dee4e5aecabe2d8b0ec7cd0ce8025066cb61674144b99612b95"
     },
     {
       "Language": "de-DE",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "d218e4456a9131df1e98d5ced43c55f29ba15fda167e41e6d31794e2a039853c"
+      "Sha256": "8c3087c2ac1dcc0fb2391a67fab66be5122caeca8decb3d8f014a9dc9a5ae773"
     },
     {
       "Language": "fr-FR",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "d7c192aa2e62d99c2f37d7317e3d77f412825a51cea9d7d0975024e72dd6cb61"
+      "Sha256": "348bdfdad3579e20f7d0f90a5d70e2d6ff6dbdc0d54638b1a89f50d2318adc7f"
     },
     {
       "Language": "es-ES",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "3539deaf197777924e07f9fbef1c5b3c3f15f7e53d4ab868026cc7c9978c733a"
+      "Sha256": "df6b28b1a2418d707c745ea7b940af569989893e7d19855c96afe1e3688b381d"
     },
     {
       "Language": "pt-BR",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "d0a207ef1f2e442e5a3e3325c5075958f01aa8ac95ed3576b5ec26aaea70e9d9"
+      "Sha256": "1f77271797fe53f1fedd88174927f27ece9ecfee014926fbcbece0869c0b4513"
     },
     {
       "Language": "ru-RU",
       "Skills": 15541,
       "Npcs": 12620,
-      "Maps": 803,
+      "Maps": 823,
       "Servers": 749,
-      "Sha256": "b55abcf4a6f61509b611011cf76a6d0b74935470dda4eb37d5ef5c5fbde2dcd0"
+      "Sha256": "6eebbbb869021d59432be206872f0d804297535c04025ff0297652f4d794a79b"
     }
   ]
 }

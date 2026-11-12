@@ -124,12 +124,13 @@ public sealed class SteamMapReplayTests
             new ResourceCatalogSnapshot(shared, locale, ResourceCatalog.GetResourceSet(ClientProfiles.Steam)));
         Assert.Equal(ExpectedMaps, ReadSceneEvents(ReplaySession(empty))
             .Where(static scene => scene.Kind == SceneObservationKind.MapContextStarted).Select(static scene => scene.MapId));
+        Assert.False(empty.Resources.Maps.ContainsKey(100011));
+        Assert.Equal("100011", empty.Resources.ResolveMapName(100011));
 
         var japanese = new SceneClientContext(ClientProfiles.Steam, ResourceCatalog.Load(ClientProfiles.Steam, "ja-JP"));
         Assert.Equal(ExpectedMaps, ReadSceneEvents(ReplaySession(japanese))
             .Where(static scene => scene.Kind == SceneObservationKind.MapContextStarted).Select(static scene => scene.MapId));
-        Assert.False(japanese.Resources.Maps.ContainsKey(100011));
-        Assert.Equal("100011", japanese.Resources.ResolveMapName(100011));
+        Assert.Equal("フォイニクスの空中島", japanese.Resources.ResolveMapName(100011));
     }
 
     private static PacketLogReplayResult ReplaySession(SceneClientContext? context = null) => PacketLogReplayService.ReplayMany(

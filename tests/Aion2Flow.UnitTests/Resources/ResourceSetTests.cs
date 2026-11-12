@@ -35,7 +35,7 @@ public sealed class ResourceSetTests
             Assert.Equal(language, localized.Language);
             Assert.Equal(15_541, localized.SkillDefinitions.Count);
             Assert.Equal(12_620, localized.NpcCatalog.Count);
-            Assert.Equal(803, localized.Maps.Count);
+            Assert.Equal(823, localized.Maps.Count);
             Assert.StartsWith("steam/", localized.ResolveSkillIconAssetName(12_240_010));
         }
     }

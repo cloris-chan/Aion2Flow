@@ -1,0 +1,54 @@
+{
+  "ResourceSetId": "steam",
+  "Rows": 741,
+  "Locales": [
+    {
+      "Language": "en-US",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "ko-KR",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "ja-JP",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "de-DE",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "fr-FR",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "es-ES",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "pt-BR",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    },
+    {
+      "Language": "ru-RU",
+      "VerifiedNames": 709,
+      "PriorSourceOverrides": 32,
+      "RowsWithoutLocalizedName": []
+    }
+  ]
+}
