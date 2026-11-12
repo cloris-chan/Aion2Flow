@@ -992,10 +992,6 @@ public readonly record struct SceneArchiveEntityIdentity
     public int? OwnerEntityId { get; init; }
     public EntityOwnerKind OwnerKind { get; init; }
     public bool NpcCombatActive { get; init; }
-    public long? Value2136 { get; init; }
-    public long? Sequence2136 { get; init; }
-    public long? Value0140 { get; init; }
-    public long? Value0240 { get; init; }
     public (byte State0, byte State1)? State4636 { get; init; }
     public (int SequenceId, int ResultCode)? Latest2C38 { get; init; }
     public long LastObservedOrdinal { get; init; }
@@ -1008,10 +1004,6 @@ public readonly record struct SceneArchiveEntityIdentity
         OwnerEntityId = e.OwnerEntityId,
         OwnerKind = e.OwnerKind,
         NpcCombatActive = e.NpcCombatActive,
-        Value2136 = e.Value2136,
-        Sequence2136 = e.Sequence2136,
-        Value0140 = e.Value0140,
-        Value0240 = e.Value0240,
         State4636 = e.State4636,
         Latest2C38 = e.Latest2C38,
         LastObservedOrdinal = e.LastObservedOrdinal

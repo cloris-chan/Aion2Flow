@@ -143,15 +143,17 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
         AddKnownEntity(instanceId);
     }
 
-    public void SetCurrentMap(in PacketObservationSource packet, uint mapId)
+    public bool SetCurrentMap(in PacketObservationSource packet, uint mapId)
     {
         if (_mapContext.TryConfirmCurrentMap(mapId, out var boundaryMapId))
         {
+            var hadMapScope = _mapContext.HasMapScope;
             StartMapContext(in packet, boundaryMapId);
-            return;
+            return hadMapScope;
         }
 
         AppendSceneMapObservation(in packet, mapId, SceneObservationKind.CurrentMap);
+        return false;
     }
 
     public void EnsureUnknownMapScope(in PacketObservationSource packet)
@@ -750,64 +752,6 @@ public sealed class JournalingRuntimeObservationSink : IRuntimeObservationSink
                 DetailRaw = 0
             });
         collectionPolicy?.OnBossMetadataChanged();
-    }
-
-    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0)
-    {
-        instanceId = ResolveLifecycleId(instanceId);
-        var state = GetOrAddNpcState(instanceId);
-        state.Sequence2136 = sequence;
-        state.Value2136 = value0;
-        AddKnownEntity(instanceId);
-        var stamp = CreateStamp(in packet);
-        journal.Append(
-            CreateHeader(in stamp, instanceId, 0, packet.Raw),
-            new StateObservation
-            {
-                EntityId = instanceId,
-                StateCode = 2136,
-                Value0 = sequence,
-                Value1 = value0,
-                DetailRaw = 0
-            });
-    }
-
-    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
-    {
-        instanceId = ResolveLifecycleId(instanceId);
-        var state = GetOrAddNpcState(instanceId);
-        state.Value0140 = value0;
-        AddKnownEntity(instanceId);
-        var stamp = CreateStamp(in packet);
-        journal.Append(
-            CreateHeader(in stamp, instanceId, 0, packet.Raw),
-            new StateObservation
-            {
-                EntityId = instanceId,
-                StateCode = 140,
-                Value0 = value0,
-                Value1 = 0,
-                DetailRaw = 0
-            });
-    }
-
-    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
-    {
-        instanceId = ResolveLifecycleId(instanceId);
-        var state = GetOrAddNpcState(instanceId);
-        state.Value0240 = value0;
-        AddKnownEntity(instanceId);
-        var stamp = CreateStamp(in packet);
-        journal.Append(
-            CreateHeader(in stamp, instanceId, 0, packet.Raw),
-            new StateObservation
-            {
-                EntityId = instanceId,
-                StateCode = 240,
-                Value0 = value0,
-                Value1 = 0,
-                DetailRaw = 0
-            });
     }
 
     public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1)

@@ -534,24 +534,6 @@ public sealed class DomainEventApplier
             return;
         }
 
-        if (state.StateCode == 2136)
-        {
-            _entities.ApplyNpc2136State(state.EntityId, state.Value0, state.Value1);
-            return;
-        }
-
-        if (state.StateCode == 140)
-        {
-            _entities.ApplyNpc0140Value(state.EntityId, state.Value0);
-            return;
-        }
-
-        if (state.StateCode == 240)
-        {
-            _entities.ApplyNpc0240Value(state.EntityId, state.Value0);
-            return;
-        }
-
         if (state.StateCode == 4636)
         {
             _entities.ApplyNpc4636State(state.EntityId, checked((byte)state.Value0), checked((byte)state.Value1));

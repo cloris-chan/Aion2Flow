@@ -85,24 +85,6 @@ internal static class SyntheticObservationExtensions
         sink.ToggleNpcBattle(in source, instanceId);
     }
 
-    public static void AppendNpc2136State(this IRuntimeObservationSink sink, int instanceId, long sequence, long value0)
-    {
-        var source = Source(opcode: 0x2136);
-        sink.AppendNpc2136State(in source, instanceId, sequence, value0);
-    }
-
-    public static void AppendNpc0140Value(this IRuntimeObservationSink sink, int instanceId, long value0)
-    {
-        var source = Source(opcode: 0x0140);
-        sink.AppendNpc0140Value(in source, instanceId, value0);
-    }
-
-    public static void AppendNpc0240Value(this IRuntimeObservationSink sink, int instanceId, long value0)
-    {
-        var source = Source(opcode: 0x0240);
-        sink.AppendNpc0240Value(in source, instanceId, value0);
-    }
-
     public static void AppendNpc4636State(this IRuntimeObservationSink sink, int instanceId, byte state0, byte state1)
     {
         var source = Source(opcode: 0x4636);

@@ -31,6 +31,9 @@ internal sealed class MapRuntimeObservationContext
         if (mapId == 0)
             return false;
 
+        // A current-map confirmation consumes any preceding unpaired arrival.
+        _arrivalConfirmed = false;
+
         if (_currentMapIsProvisional)
         {
             if (_provisionalCombatObserved)
@@ -208,10 +211,6 @@ internal sealed class RuntimeNpcState
     public long? HpObservedAtMilliseconds { get; set; }
     public bool? BattleToggledOn { get; set; }
     public NpcKind? Kind { get; set; }
-    public long? Value2136 { get; set; }
-    public long? Sequence2136 { get; set; }
-    public long? Value0140 { get; set; }
-    public long? Value0240 { get; set; }
     public (byte State0, byte State1)? State4636 { get; set; }
     public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
 
@@ -223,10 +222,6 @@ internal sealed class RuntimeNpcState
             HpObservedAtMilliseconds,
             BattleToggledOn,
             Kind,
-            Value2136,
-            Sequence2136,
-            Value0140,
-            Value0240,
             State4636,
             Latest2C38);
 }

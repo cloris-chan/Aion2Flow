@@ -10,6 +10,9 @@ internal static class PacketMapHandler
         var scopeStarted = false;
         switch (mapEvent.Kind)
         {
+            case PacketMapEventKind.CurrentMap:
+                scopeStarted = context.Sink.SetCurrentMap(in source, mapEvent.Id);
+                break;
             case PacketMapEventKind.Candidate:
                 scopeStarted = context.Sink.StageMapCandidate(in source, mapEvent.Id);
                 break;

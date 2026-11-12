@@ -9,17 +9,10 @@ public sealed class NpcRuntimeObservationStoreTests
     {
         using var scene = new SceneTestHarness();
 
-        scene.AppendNpc2136State(4370, 6, 200003);
-        scene.AppendNpc0140Value(4370, 200003);
-        scene.AppendNpc0240Value(4370, 200003);
         scene.AppendNpc4636State(4370, 2, 79);
         scene.Sink.RegisterObservation2C38(4370, 95, 7, 0, 0);
 
         Assert.True(scene.TryGetNpcRuntimeState(4370, out var state));
-        Assert.Equal(6L, state.Sequence2136);
-        Assert.Equal(200003L, state.Value2136);
-        Assert.Equal(200003L, state.Value0140);
-        Assert.Equal(200003L, state.Value0240);
         Assert.Equal((byte)2, state.State4636?.State0);
         Assert.Equal((byte)79, state.State4636?.State1);
         Assert.Equal(95, state.Latest2C38?.SequenceId);

@@ -3,10 +3,6 @@ namespace Cloris.Aion2Flow.SceneRuntime.Combat;
 public sealed class NpcRuntimeObservation
 {
     public int InstanceId { get; set; }
-    public long? Value2136 { get; set; }
-    public long? Sequence2136 { get; set; }
-    public long? Value0140 { get; set; }
-    public long? Value0240 { get; set; }
     public byte? State4636Value0 { get; set; }
     public byte? State4636Value1 { get; set; }
     public int? Sequence2C38 { get; set; }
@@ -20,10 +16,6 @@ public sealed class NpcRuntimeObservation
         return new NpcRuntimeObservation
         {
             InstanceId = InstanceId,
-            Value2136 = Value2136,
-            Sequence2136 = Sequence2136,
-            Value0140 = Value0140,
-            Value0240 = Value0240,
             State4636Value0 = State4636Value0,
             State4636Value1 = State4636Value1,
             Sequence2C38 = Sequence2C38,

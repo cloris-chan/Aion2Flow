@@ -275,27 +275,6 @@ public sealed class NpcCatalogSceneTests
         Assert.Equal(npcCode, scopedNpcCode);
     }
 
-    [Fact]
-    public void Scene_State_Catalog_Probe_Does_Not_Overwrite_NpcSpawn_Code_When_Value_Misses_Catalog()
-    {
-        const int entityId = 4370;
-        const int npcCode = 2980049;
-        const int sceneStateValue = 200003;
-        var catalog = ResourceCatalog.Load(ResourceLanguage.TraditionalChinese).NpcCatalog;
-        Assert.True(catalog.ContainsKey(npcCode));
-        Assert.False(catalog.ContainsKey(sceneStateValue));
-        _clientContext = CombatResourceTestFixture.CreateContext([], catalog);
-        using var scene = new SceneTestHarness(_clientContext);
-
-        scene.AppendNpcCode(entityId, npcCode);
-        scene.AppendNpcKind(entityId, CombatResourceRegistry.ResolveNpcKind(catalog[npcCode].Kind));
-        scene.AppendNpc2136State(entityId, sequence: 6, value0: sceneStateValue);
-
-        Assert.True(scene.TryGetNpcRuntimeState(entityId, out var state), $"Replay scene missing NPC state for entity {entityId}");
-        Assert.Equal(npcCode, state.NpcCode);
-        Assert.Equal((long)sceneStateValue, state.Value2136);
-    }
-
     [Theory]
     [InlineData(16710, 2980179, 9206, 36_358)]
     [InlineData(17858, 2980049, 9849, 27_944)]

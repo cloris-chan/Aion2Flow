@@ -49,12 +49,6 @@ public sealed class SceneTestHarness : IDisposable
 
     public void ToggleNpcBattle(int instanceId) => Sink.ToggleNpcBattle(NextSource(), instanceId);
 
-    public void AppendNpc2136State(int instanceId, long sequence, long value0) => Sink.AppendNpc2136State(NextSource(), instanceId, sequence, value0);
-
-    public void AppendNpc0140Value(int instanceId, long value0) => Sink.AppendNpc0140Value(NextSource(), instanceId, value0);
-
-    public void AppendNpc0240Value(int instanceId, long value0) => Sink.AppendNpc0240Value(NextSource(), instanceId, value0);
-
     public void AppendNpc4636State(int instanceId, byte state0, byte state1) => Sink.AppendNpc4636State(NextSource(), instanceId, state0, state1);
 
     public void AppendSummon(int ownerId, int summonInstanceId) => Sink.AppendSummon(NextSource(), ownerId, summonInstanceId);
@@ -77,7 +71,7 @@ public sealed class SceneTestHarness : IDisposable
         if (Owner.Entities.TryGet(instanceId, out var entity))
         {
             Owner.EntityVitals.TryGet(instanceId, out var vital);
-            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
+            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.State4636, entity.Latest2C38);
             return true;
         }
 
@@ -153,7 +147,7 @@ public sealed class SceneTestHarness : IDisposable
         public void SeedNpcRuntimeState(in PacketObservationSource packet, int instanceId, in RuntimeNpcStateSnapshot state) => inner.SeedNpcRuntimeState(in packet, instanceId, in state);
         public int ResolveNpcObservationSource() => inner.ResolveNpcObservationSource();
         public void RememberNpcObservationSource(int instanceId) => inner.RememberNpcObservationSource(instanceId);
-        public void SetCurrentMap(in PacketObservationSource packet, uint mapId) => inner.SetCurrentMap(in packet, mapId);
+        public bool SetCurrentMap(in PacketObservationSource packet, uint mapId) => inner.SetCurrentMap(in packet, mapId);
         public void EnsureUnknownMapScope(in PacketObservationSource packet) => inner.EnsureUnknownMapScope(in packet);
         public bool StageMapCandidate(in PacketObservationSource packet, uint mapId) => inner.StageMapCandidate(in packet, mapId);
         public bool ConfirmDestinationMapArrival(in PacketObservationSource packet) => inner.ConfirmDestinationMapArrival(in packet);
@@ -185,9 +179,6 @@ public sealed class SceneTestHarness : IDisposable
         public void AppendNpcHp(in PacketObservationSource packet, int instanceId, long hp, long maxHp) => inner.AppendNpcHp(in packet, instanceId, hp, maxHp);
         public void SetNpcBattle(in PacketObservationSource packet, int instanceId, bool isActive) => inner.SetNpcBattle(in packet, instanceId, isActive);
         public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId) => inner.ToggleNpcBattle(in packet, instanceId);
-        public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0) => inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
-        public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0) => inner.AppendNpc0140Value(in packet, instanceId, value0);
-        public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0) => inner.AppendNpc0240Value(in packet, instanceId, value0);
         public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1) => inner.AppendNpc4636State(in packet, instanceId, state0, state1);
         public void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId) => inner.AppendSummon(in packet, ownerId, summonInstanceId);
     }

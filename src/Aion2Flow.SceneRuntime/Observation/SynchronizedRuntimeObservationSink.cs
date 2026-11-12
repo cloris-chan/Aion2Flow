@@ -67,9 +67,9 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
         lock (gate) inner.RememberNpcObservationSource(instanceId);
     }
 
-    public void SetCurrentMap(in PacketObservationSource packet, uint mapId)
+    public bool SetCurrentMap(in PacketObservationSource packet, uint mapId)
     {
-        lock (gate) inner.SetCurrentMap(in packet, mapId);
+        lock (gate) return inner.SetCurrentMap(in packet, mapId);
     }
 
     public void EnsureUnknownMapScope(in PacketObservationSource packet)
@@ -205,21 +205,6 @@ public sealed class SynchronizedRuntimeObservationSink(IRuntimeObservationSink i
     public void ToggleNpcBattle(in PacketObservationSource packet, int instanceId)
     {
         lock (gate) inner.ToggleNpcBattle(in packet, instanceId);
-    }
-
-    public void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0)
-    {
-        lock (gate) inner.AppendNpc2136State(in packet, instanceId, sequence, value0);
-    }
-
-    public void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0)
-    {
-        lock (gate) inner.AppendNpc0140Value(in packet, instanceId, value0);
-    }
-
-    public void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0)
-    {
-        lock (gate) inner.AppendNpc0240Value(in packet, instanceId, value0);
     }
 
     public void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1)

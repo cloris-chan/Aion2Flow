@@ -34,7 +34,7 @@ public static class SceneReplayTestView
         if (replay.SceneOwner.Entities.TryGet(entityId, out var entity))
         {
             replay.SceneOwner.EntityVitals.TryGet(entityId, out var vital);
-            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.Value2136, entity.Sequence2136, entity.Value0140, entity.Value0240, entity.State4636, entity.Latest2C38);
+            state = new RuntimeNpcStateSnapshot(entity.NpcCode, vital.EntityId > 0 ? vital.CurrentHp : null, vital.MaxHp, vital.EntityId > 0 ? vital.ObservedAtMilliseconds : null, entity.NpcCombatActive, entity.Kind, entity.State4636, entity.Latest2C38);
             return true;
         }
 

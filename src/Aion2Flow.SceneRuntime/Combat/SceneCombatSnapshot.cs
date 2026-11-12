@@ -465,10 +465,6 @@ public readonly record struct EncounterSummarySnapshot(
 
 public readonly record struct NpcRuntimeObservationSnapshot(
     int InstanceId,
-    long? Value2136,
-    long? Sequence2136,
-    long? Value0140,
-    long? Value0240,
     byte? State4636Value0,
     byte? State4636Value1,
     int? Sequence2C38,

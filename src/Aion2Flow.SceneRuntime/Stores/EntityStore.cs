@@ -148,37 +148,6 @@ public sealed class EntityStore
         _volatileStateRevision++;
     }
 
-    public void ApplyNpc2136State(int instanceId, long sequence, long value0)
-    {
-        var entity = GetOrAdd(instanceId);
-        if (entity.Sequence2136 == sequence && entity.Value2136 == value0)
-            return;
-
-        entity.Sequence2136 = sequence;
-        entity.Value2136 = value0;
-        _volatileStateRevision++;
-    }
-
-    public void ApplyNpc0140Value(int instanceId, long value0)
-    {
-        var entity = GetOrAdd(instanceId);
-        if (entity.Value0140 == value0)
-            return;
-
-        entity.Value0140 = value0;
-        _volatileStateRevision++;
-    }
-
-    public void ApplyNpc0240Value(int instanceId, long value0)
-    {
-        var entity = GetOrAdd(instanceId);
-        if (entity.Value0240 == value0)
-            return;
-
-        entity.Value0240 = value0;
-        _volatileStateRevision++;
-    }
-
     public void ApplyNpc4636State(int instanceId, byte state0, byte state1)
     {
         var entity = GetOrAdd(instanceId);
@@ -232,10 +201,6 @@ public sealed class EntityRecord
     public int? OwnerEntityId { get; set; }
     public EntityOwnerKind OwnerKind { get; set; }
     public bool NpcCombatActive { get; set; }
-    public long? Value2136 { get; set; }
-    public long? Sequence2136 { get; set; }
-    public long? Value0140 { get; set; }
-    public long? Value0240 { get; set; }
     public (byte State0, byte State1)? State4636 { get; set; }
     public (int SequenceId, int ResultCode)? Latest2C38 { get; set; }
     public long LastObservedOrdinal { get; set; }

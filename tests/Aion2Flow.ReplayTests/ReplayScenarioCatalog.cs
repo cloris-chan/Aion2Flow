@@ -43,6 +43,7 @@ public static class ReplayScenarioCatalog
     public const string CurrentChargeCooldown = "aion2flow.stream.20260809050345.log";
     public const string CurrentRoundTripShortUptime = "aion2flow.stream.20261007155148.log";
     public const string CurrentRoundTripLongUptime = "aion2flow.stream.20261017050224.log";
+    public const string CurrentPurpleDungeonCycle = "aion2flow.stream.20261112014521.log";
     public const string SteamSummonOwnership = "aion2flow.stream.20261031060531.log";
     public static readonly string[] SteamContinuousSession =
     [

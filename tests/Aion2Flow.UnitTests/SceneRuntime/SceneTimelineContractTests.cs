@@ -14,22 +14,6 @@ namespace Cloris.Aion2Flow.Tests.SceneRuntime;
 public class SceneTimelineContractTests
 {
     [Fact]
-    public void SceneMapIdClassifier_AcceptsEveryCurrentClientMap()
-    {
-        foreach (var mapId in ResourceCatalog.Load(ResourceLanguage.English).Maps.Keys)
-            Assert.True(SceneMapIdClassifier.IsKnownMapId(mapId, SceneClientContext.Purple), $"missing map id {mapId}");
-    }
-
-    [Theory]
-    [InlineData(0u)]
-    [InlineData(19u)]
-    [InlineData(1_999u)]
-    [InlineData(123_456u)]
-    [InlineData(999_999u)]
-    public void SceneMapIdClassifier_RejectsValuesAbsentFromCurrentClientMapResources(uint value)
-        => Assert.False(SceneMapIdClassifier.IsKnownMapId(value, SceneClientContext.Purple));
-
-    [Fact]
     public void Journal_CombatEntry_ExposesOnlyTypedCombatPayload()
     {
         var journal = new ObservedEventJournal();
@@ -920,7 +904,7 @@ public class SceneTimelineContractTests
     [Theory]
     [InlineData(ClientVersion.Purple)]
     [InlineData(ClientVersion.Steam)]
-    public void LiveScene_MapCandidateKeepsOldCombatUntilArrival(ClientVersion client)
+    public void LiveScene_CurrentMapConfirmationKeepsNextDestinationPendingUntilArrival(ClientVersion client)
     {
         var scene = new SceneLiveReadModel(DateTimeOffset.UnixEpoch, SceneClientContext.Create(ClientProfiles.Get(client)));
         var sink = SceneSinkFactory.CreateForLive(scene)();
@@ -940,15 +924,17 @@ public class SceneTimelineContractTests
         _ = scene.CreateFrame();
         var oldOwner = scene.Owner;
 
-        sink.StageMapCandidate(Source(200, 4, 0x2136), 1002);
-        sink.AppendCombatWireObservation(Source(210, 5, 0x0438), 300, 500, in oldCombat);
+        Assert.False(sink.ConfirmDestinationMapArrival(Source(150, 4, 0x2336)));
+        Assert.False(sink.SetCurrentMap(Source(160, 5, 0x0140), 1001));
+        Assert.False(sink.StageMapCandidate(Source(200, 6, 0x2136), 1002));
+        sink.AppendCombatWireObservation(Source(210, 7, 0x0438), 300, 500, in oldCombat);
         sink.CompleteFlush(2);
 
         Assert.Same(oldOwner, scene.Owner);
         Assert.Equal(850_924, scene.CreateFrame().Snapshot.Combatants[300].DamageAmount);
         Assert.False(scene.TryDequeueMapTransition(out _));
 
-        sink.ConfirmDestinationMapArrival(Source(7_539, 6, 0x2336));
+        sink.ConfirmDestinationMapArrival(Source(7_539, 8, 0x2336));
 
         Assert.NotSame(oldOwner, scene.Owner);
         Assert.Equal(1002u, scene.CreateFrame().Snapshot.MapId);

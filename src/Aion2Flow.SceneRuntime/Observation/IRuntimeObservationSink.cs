@@ -26,7 +26,7 @@ public interface IRuntimeObservationSink
 
     void RememberNpcObservationSource(int instanceId);
 
-    void SetCurrentMap(in PacketObservationSource packet, uint mapId);
+    bool SetCurrentMap(in PacketObservationSource packet, uint mapId);
 
     void EnsureUnknownMapScope(in PacketObservationSource packet);
 
@@ -82,15 +82,9 @@ public interface IRuntimeObservationSink
 
     void ToggleNpcBattle(in PacketObservationSource packet, int instanceId);
 
-    void AppendNpc2136State(in PacketObservationSource packet, int instanceId, long sequence, long value0);
-
-    void AppendNpc0140Value(in PacketObservationSource packet, int instanceId, long value0);
-
-    void AppendNpc0240Value(in PacketObservationSource packet, int instanceId, long value0);
-
     void AppendNpc4636State(in PacketObservationSource packet, int instanceId, byte state0, byte state1);
 
     void AppendSummon(in PacketObservationSource packet, int ownerId, int summonInstanceId);
 }
 
-public readonly record struct RuntimeNpcStateSnapshot(int? NpcCode, long? Hp, long? MaxHp, long? HpObservedAtMilliseconds, bool? BattleToggledOn, NpcKind? Kind, long? Value2136, long? Sequence2136, long? Value0140, long? Value0240, (byte State0, byte State1)? State4636, (int SequenceId, int ResultCode)? Latest2C38);
+public readonly record struct RuntimeNpcStateSnapshot(int? NpcCode, long? Hp, long? MaxHp, long? HpObservedAtMilliseconds, bool? BattleToggledOn, NpcKind? Kind, (byte State0, byte State1)? State4636, (int SequenceId, int ResultCode)? Latest2C38);

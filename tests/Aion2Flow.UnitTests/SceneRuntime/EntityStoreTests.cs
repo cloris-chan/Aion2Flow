@@ -22,7 +22,7 @@ public class EntityStoreTests
         Assert.Equal(0, store.VolatileStateRevision);
 
         store.ApplyBattleToggle(200, true);
-        store.ApplyNpc2136State(200, 1, 2);
+        store.ApplyNpc4636State(200, 1, 2);
 
         Assert.Equal(1, store.IdentityRevision);
         Assert.Equal(2, store.VolatileStateRevision);
@@ -368,13 +368,10 @@ public class DomainEventApplierTests
         var journal = new ObservedEventJournal(clientContext: _clientContext);
         var sceneId = Guid.NewGuid();
 
-        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 2136, Value0 = 6, Value1 = 200003 });
-        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 1 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 140, Value0 = 200003 });
-        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 2 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 240, Value0 = 200003 });
-        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 3 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 4636, Value0 = 2, Value1 = 79 });
+        journal.AppendState(sceneId, new TimelineStamp { ObservationOrdinal = 0 }, 4370, 0, new StateObservation { EntityId = 4370, StateCode = 4636, Value0 = 2, Value1 = 79 });
         journal.AppendAura(
             sceneId,
-            new TimelineStamp { ObservationOrdinal = 4 },
+            new TimelineStamp { ObservationOrdinal = 1 },
             0,
             4370,
             new AuraObservation { Kind = AuraObservationKind.Result, EntityId = 4370, InstanceSequenceId = 95, ResultCode = 7 });
@@ -386,10 +383,6 @@ public class DomainEventApplierTests
         applier.ApplyJournal(journal);
 
         Assert.True(entities.TryGet(4370, out var entity));
-        Assert.Equal(6L, entity!.Sequence2136);
-        Assert.Equal(200003L, entity.Value2136);
-        Assert.Equal(200003L, entity.Value0140);
-        Assert.Equal(200003L, entity.Value0240);
         Assert.Equal(((byte)2, (byte)79), entity.State4636);
         Assert.Equal((95, 7), entity.Latest2C38);
     }

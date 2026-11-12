@@ -856,10 +856,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
         if (targetId <= 0)
             return null;
 
-        long? value2136 = null;
-        long? sequence2136 = null;
-        long? value0140 = null;
-        long? value0240 = null;
         byte? state4636Value0 = null;
         byte? state4636Value1 = null;
         int? sequence2C38 = null;
@@ -869,10 +865,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
         if (entities.TryGet(targetId, out var entity))
         {
-            value2136 = entity.Value2136;
-            sequence2136 = entity.Sequence2136;
-            value0140 = entity.Value0140;
-            value0240 = entity.Value0240;
             state4636Value0 = entity.State4636?.State0;
             state4636Value1 = entity.State4636?.State1;
             sequence2C38 = entity.Latest2C38?.SequenceId;
@@ -886,10 +878,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
         var mutableObservation = new NpcRuntimeObservation
         {
             InstanceId = targetId,
-            Value2136 = value2136,
-            Sequence2136 = sequence2136,
-            Value0140 = value0140,
-            Value0240 = value0240,
             State4636Value0 = state4636Value0,
             State4636Value1 = state4636Value1,
             Sequence2C38 = sequence2C38,
@@ -901,10 +889,6 @@ public sealed class SceneCombatSnapshotAdapter(EntityStore entities, EntityVital
 
         return new NpcRuntimeObservationSnapshot(
             targetId,
-            value2136,
-            sequence2136,
-            value0140,
-            value0240,
             state4636Value0,
             state4636Value1,
             sequence2C38,

@@ -5,7 +5,8 @@ internal enum PacketMapEventKind : byte
     Candidate,
     Arrival,
     InstanceRegistered,
-    InstanceUnregistered
+    InstanceUnregistered,
+    CurrentMap
 }
 
 internal readonly record struct PacketMapEvent(PacketMapEventKind Kind, uint Id);

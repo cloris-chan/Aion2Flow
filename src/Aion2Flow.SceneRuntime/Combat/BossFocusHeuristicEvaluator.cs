@@ -16,30 +16,6 @@ internal static class BossFocusHeuristicEvaluator
             };
         }
 
-        if (observation?.PhaseHint == NpcRuntimePhaseHint.Teardown)
-        {
-            return new EncounterSummary
-            {
-                TrackingTargetId = trackingTargetId,
-                PhaseHint = observation.PhaseHint,
-                IsActive = false,
-                ShouldArchive = encounterTime > 0 || observation.Hp.HasValue,
-                Reason = "teardown-hint"
-            };
-        }
-
-        if (observation?.PhaseHint == NpcRuntimePhaseHint.SceneActivation)
-        {
-            return new EncounterSummary
-            {
-                TrackingTargetId = trackingTargetId,
-                PhaseHint = observation.PhaseHint,
-                IsActive = true,
-                ShouldArchive = false,
-                Reason = "scene-activation-hint"
-            };
-        }
-
         if (encounterTime > 0)
         {
             return new EncounterSummary

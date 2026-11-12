@@ -234,15 +234,14 @@ public sealed class PacketLogReplayServiceTests
             .ToArray();
 
         var replay = PacketLogReplayService.ReplayMany(paths);
-        var transitions = ReadSceneTransitions(replay)
-            .Select(static transition => transition.MapId)
-            .ToArray();
+        var transitions = ReadSceneTransitions(replay).ToArray();
         var combat = ReadCombatWireEntries(replay);
         var damage = combat
             .Where(static entry => entry.Observation.Damage > 0)
             .ToArray();
 
-        Assert.Equal([600132u, 600142u, 1110u, 600132u, 1110u], transitions);
+        Assert.Equal([600132u, 1110u, 600142u, 1110u, 600132u, 1110u], transitions.Select(static transition => transition.MapId));
+        Assert.Equal((ushort)0x0140, transitions[1].Opcode);
         Assert.Equal(726, combat.Count);
         Assert.Equal(15, damage.Length);
         Assert.Equal(103_966, damage.Sum(static entry => entry.Observation.Damage));
