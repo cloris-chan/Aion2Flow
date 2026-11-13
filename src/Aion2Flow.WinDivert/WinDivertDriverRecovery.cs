@@ -497,35 +497,40 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
         var resumeHandle = 0u;
         while (true)
         {
-            if (PInvoke.EnumServicesStatusEx(
-                    manager,
-                    SC_ENUM_TYPE.SC_ENUM_PROCESS_INFO,
-                    ENUM_SERVICE_TYPE.SERVICE_DRIVER,
-                    ENUM_SERVICE_STATE.SERVICE_STATE_ALL,
-                    buffer,
-                    out var bytesNeeded,
-                    out var servicesReturned,
-                    ref resumeHandle,
-                    null))
+            // Service name pointers remain valid only while their containing buffer is pinned.
+            fixed (byte* bufferPointer = buffer)
             {
-                AppendServiceNames(buffer, servicesReturned, names, filter);
-                break;
+                if (unsafe(PInvoke.EnumServicesStatusEx(
+                        manager,
+                        SC_ENUM_TYPE.SC_ENUM_PROCESS_INFO,
+                        ENUM_SERVICE_TYPE.SERVICE_DRIVER,
+                        ENUM_SERVICE_STATE.SERVICE_STATE_ALL,
+                        bufferPointer,
+                        (uint)buffer.Length,
+                        out var bytesNeeded,
+                        out var servicesReturned,
+                        ref resumeHandle,
+                        null)))
+                {
+                    AppendServiceNames(buffer, servicesReturned, names, filter);
+                    break;
+                }
+
+                var error = Marshal.GetLastPInvokeError();
+                if (error != ErrorMoreData && error != ErrorInsufficientBuffer)
+                {
+                    WinDivertLog.Write(WinDivertLogLevel.Warning, $"EnumServicesStatusEx failed while searching recovery services: {FormatError(error)}.");
+                    break;
+                }
+
+                if (servicesReturned != 0)
+                    AppendServiceNames(buffer, servicesReturned, names, filter);
+
+                if (bytesNeeded == 0)
+                    break;
+
+                buffer = GC.AllocateUninitializedArray<byte>((int)bytesNeeded);
             }
-
-            var error = Marshal.GetLastPInvokeError();
-            if (error != ErrorMoreData && error != ErrorInsufficientBuffer)
-            {
-                WinDivertLog.Write(WinDivertLogLevel.Warning, $"EnumServicesStatusEx failed while searching recovery services: {FormatError(error)}.");
-                break;
-            }
-
-            if (servicesReturned != 0)
-                AppendServiceNames(buffer, servicesReturned, names, filter);
-
-            if (bytesNeeded == 0)
-                break;
-
-            buffer = GC.AllocateUninitializedArray<byte>((int)bytesNeeded);
         }
 
         return names;
@@ -695,20 +700,23 @@ internal sealed class WinDivertDriverRecovery : IWinDivertDriverRecovery
             return new WinDivertServiceSnapshot(true, 0, 0, 0, string.Empty, 0, error, 0, 0);
         }
 
-        _ = PInvoke.QueryServiceConfig(service, [], out var configBytes);
+        _ = unsafe(PInvoke.QueryServiceConfig(service, null, 0, out var configBytes));
         var configError = Marshal.GetLastPInvokeError();
         if (configBytes == 0 || configError != ErrorInsufficientBuffer)
             return new WinDivertServiceSnapshot(true, (uint)status.dwServiceType, 0, 0, string.Empty, (uint)status.dwCurrentState, configError, status.dwWin32ExitCode, status.dwServiceSpecificExitCode);
 
         var buffer = GC.AllocateUninitializedArray<byte>((int)configBytes);
-        if (!PInvoke.QueryServiceConfig(service, buffer, out _))
+        fixed (byte* bufferPointer = buffer)
         {
-            var error = Marshal.GetLastPInvokeError();
-            return new WinDivertServiceSnapshot(true, (uint)status.dwServiceType, 0, 0, string.Empty, (uint)status.dwCurrentState, error, status.dwWin32ExitCode, status.dwServiceSpecificExitCode);
-        }
+            if (!unsafe(PInvoke.QueryServiceConfig(service, (QUERY_SERVICE_CONFIGW*)bufferPointer, configBytes, out _)))
+            {
+                var error = Marshal.GetLastPInvokeError();
+                return new WinDivertServiceSnapshot(true, (uint)status.dwServiceType, 0, 0, string.Empty, (uint)status.dwCurrentState, error, status.dwWin32ExitCode, status.dwServiceSpecificExitCode);
+            }
 
-        ref readonly var config = ref MemoryMarshal.AsRef<QUERY_SERVICE_CONFIGW>(buffer);
-        return new WinDivertServiceSnapshot(true, (uint)config.dwServiceType, (uint)config.dwStartType, (uint)config.dwErrorControl, config.lpBinaryPathName.ToString(), (uint)status.dwCurrentState, 0, status.dwWin32ExitCode, status.dwServiceSpecificExitCode);
+            ref readonly var config = ref MemoryMarshal.AsRef<QUERY_SERVICE_CONFIGW>(buffer);
+            return new WinDivertServiceSnapshot(true, (uint)config.dwServiceType, (uint)config.dwStartType, (uint)config.dwErrorControl, config.lpBinaryPathName.ToString(), (uint)status.dwCurrentState, 0, status.dwWin32ExitCode, status.dwServiceSpecificExitCode);
+        }
     }
 
     private static void LogSnapshot(string serviceName, in WinDivertServiceSnapshot snapshot, string phase)

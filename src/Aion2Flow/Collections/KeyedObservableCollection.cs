@@ -235,7 +235,7 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
                 }
             }
 
-            for (var i = 0; i < newList.Count; i++)
+            reconcile: for (var i = 0; i < newList.Count; i++)
             {
                 var newItem = newList[i];
                 var newKey = keySelector(newItem);
@@ -256,49 +256,41 @@ public class KeyedObservableCollection<TKey, TItem>(Func<TItem, TKey> keySelecto
                     continue;
                 }
 
-                var oldIndex = -1;
                 for (var j = i + 1; j < uiState.Count; j++)
                 {
-                    if (KeyComparer.Equals(keySelector(uiState[j]), newKey))
-                    {
-                        oldIndex = j;
-                        break;
-                    }
-                }
+                    if (!KeyComparer.Equals(keySelector(uiState[j]), newKey))
+                        continue;
 
-                if (oldIndex != -1)
-                {
-                    var oldItem = uiState[oldIndex];
+                    var oldItem = uiState[j];
                     if (!ReferenceEquals(oldItem, newItem))
                     {
-                        if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Replace, oldItem, newItem, oldIndex)))
+                        if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Replace, oldItem, newItem, j)))
                         {
                             NotifyReset();
                             return;
                         }
 
-                        uiState[oldIndex] = newItem;
+                        uiState[j] = newItem;
                     }
 
-                    if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Move, default, newItem, i, oldIndex)))
+                    if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Move, default, newItem, i, j)))
                     {
                         NotifyReset();
                         return;
                     }
 
-                    uiState.RemoveAt(oldIndex);
+                    uiState.RemoveAt(j);
                     uiState.Insert(i, newItem);
+                    continue reconcile;
                 }
-                else
+
+                if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Add, default, newItem, i)))
                 {
-                    if (RecordOperation(new DiffOperation(NotifyCollectionChangedAction.Add, default, newItem, i)))
-                    {
-                        NotifyReset();
-                        return;
-                    }
-
-                    uiState.Insert(i, newItem);
+                    NotifyReset();
+                    return;
                 }
+
+                uiState.Insert(i, newItem);
             }
 
             for (var i = 0; i < opCount; i++)

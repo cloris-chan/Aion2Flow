@@ -107,10 +107,10 @@ jobs:
           Write-Host "Public feed : $($publicUri.AbsoluteUri.TrimEnd('/'))"
           Write-Host "Object path : $($env:S3_BUCKET)/$($env:S3_PREFIX)"
 
-      - name: Setup .NET 10 SDK
+      - name: Setup .NET 11 SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Resolve and install Velopack CLI
         run: |

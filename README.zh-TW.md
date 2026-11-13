@@ -78,7 +78,7 @@ Aion2Flow 只在本機分析遊戲網路流量。
 
 ## 從原始碼建立
 
-從原始碼編譯、測試或發佈需要 .NET 10 SDK。
+從原始碼編譯、測試或發佈需要 .NET 11 SDK。
 
 ```powershell
 dotnet build Aion2Flow.slnx -c Release
@@ -89,7 +89,7 @@ dotnet publish src/Aion2Flow/Aion2Flow.csproj -c Release
 桌面程式會以 Native AOT Windows x64 形式發佈，預設輸出目錄為：
 
 ```text
-src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
+src/Aion2Flow/bin/Release/net11.0-windows/win-x64/publish/
 ```
 
 ## 目前限制

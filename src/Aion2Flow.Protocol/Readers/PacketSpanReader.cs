@@ -79,25 +79,22 @@ public ref struct PacketSpanReader(ReadOnlySpan<byte> buffer)
     public bool TryReadVarInt(out int value)
     {
         value = 0;
-        var shift = 0;
-        var count = 0;
 
-        while (true)
+        for (var shift = 0; shift < 32; shift += 7)
         {
             if (Remaining <= 0)
                 return false;
 
-            var byteVal = _buffer[Offset++] & 0xff;
-            count++;
+            var byteVal = _buffer[Offset++];
+            if (shift == 28 && (byteVal & 0xf0) != 0)
+                return false;
 
             value |= (byteVal & 0x7f) << shift;
 
             if ((byteVal & 0x80) == 0)
                 return true;
-
-            shift += 7;
-            if (shift >= 32 || count > 5)
-                return false;
         }
+
+        return false;
     }
 }

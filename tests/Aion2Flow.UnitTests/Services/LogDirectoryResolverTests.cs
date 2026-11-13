@@ -50,7 +50,7 @@ public sealed class LogDirectoryResolverTests
     public void ResolveLogDirectory_Uses_Executable_Directory_For_Development_Build()
     {
         var root = Path.Combine(Path.GetTempPath(), $"aion2flow-log-test-{Guid.NewGuid():N}");
-        var appDirectory = Path.Combine(root, "bin", "Debug", "net10.0-windows");
+        var appDirectory = Path.Combine(root, "bin", "Debug", "net11.0-windows");
 
         try
         {

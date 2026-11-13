@@ -61,6 +61,9 @@ internal sealed class PlaybackSeekCoordinator(
 
                 await seekAsync(positionMilliseconds, cancellation.Token).ConfigureAwait(false);
             }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
             catch (ObjectDisposedException) when (IsDisposed)
             {
             }

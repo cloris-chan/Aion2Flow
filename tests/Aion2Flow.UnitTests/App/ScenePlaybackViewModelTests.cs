@@ -80,6 +80,75 @@ public sealed class ScenePlaybackViewModelTests
         Assert.False(coordinator.IsBusy);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SeekCoordinator_OwnedCancellationDoesNotReportAnError(bool dispose)
+    {
+        var errors = new ConcurrentQueue<Exception>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var becameIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var coordinator = new PlaybackSeekCoordinator(async (_, cancellationToken) =>
+        {
+            started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }, errors.Enqueue, () => becameIdle.TrySetResult());
+
+        coordinator.Request(500);
+        await started.Task.WaitAsync(TestContext.Current.CancellationToken);
+        if (dispose)
+            await coordinator.DisposeAsync();
+        else
+            coordinator.CancelPending();
+        await becameIdle.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(coordinator.IsBusy);
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public async Task SeekCoordinator_UnownedCancellationIsReportedAsAnError()
+    {
+        var errors = new ConcurrentQueue<Exception>();
+        var becameIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var coordinator = new PlaybackSeekCoordinator(
+            static (_, _) => ValueTask.FromException(new OperationCanceledException("external cancellation")),
+            errors.Enqueue,
+            () => becameIdle.TrySetResult());
+
+        coordinator.Request(500);
+        await becameIdle.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.IsType<OperationCanceledException>(Assert.Single(errors));
+        Assert.False(coordinator.IsBusy);
+    }
+
+    [Fact]
+    public async Task SeekCoordinator_SupersededCancellationAllowsTheLatestRequestWithoutAnError()
+    {
+        var positions = new ConcurrentQueue<long>();
+        var errors = new ConcurrentQueue<Exception>();
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var becameIdle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var coordinator = new PlaybackSeekCoordinator(async (position, cancellationToken) =>
+        {
+            positions.Enqueue(position);
+            if (position == 1)
+            {
+                firstStarted.TrySetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+        }, errors.Enqueue, () => becameIdle.TrySetResult());
+
+        coordinator.Request(1);
+        await firstStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        coordinator.Request(2);
+        await becameIdle.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([1L, 2L], positions.ToArray());
+        Assert.Empty(errors);
+    }
+
     [Fact]
     public async Task SeekCoordinator_CancelPendingPreventsOlderSeekFromFollowingDirectNavigation()
     {

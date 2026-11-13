@@ -78,7 +78,7 @@ Aion2Flow analyzes game network traffic locally.
 
 ## Build from Source
 
-Building, testing, or publishing from source requires the .NET 10 SDK.
+Building, testing, or publishing from source requires the .NET 11 SDK.
 
 ```powershell
 dotnet build Aion2Flow.slnx -c Release
@@ -89,7 +89,7 @@ dotnet publish src/Aion2Flow/Aion2Flow.csproj -c Release
 The desktop app is published as a Native AOT Windows x64 build. The default publish output is:
 
 ```text
-src/Aion2Flow/bin/Release/net10.0-windows/win-x64/publish/
+src/Aion2Flow/bin/Release/net11.0-windows/win-x64/publish/
 ```
 
 ## Current Limitations

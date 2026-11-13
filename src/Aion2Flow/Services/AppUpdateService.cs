@@ -60,10 +60,11 @@ public sealed partial class AppUpdateService : ObservableObject
                 sources = CreateUpdateSources(backupUpdateFeedUrl: null, isPrereleaseBuild);
             }
 
-            var endpoints = new List<IAppUpdateEndpoint>(sources.Length)
-            {
+            List<IAppUpdateEndpoint> endpoints =
+            [
+                with(capacity: sources.Length),
                 new VelopackUpdateEndpoint(sources[0].Name, sources[0].Source)
-            };
+            ];
             for (var i = 1; i < sources.Length; i++)
             {
                 try
