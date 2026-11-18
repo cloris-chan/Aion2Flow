@@ -2,72 +2,72 @@
   "ResourceSetId": "steam",
   "DefaultLanguage": "en-US",
   "SkillDefinitions": 15541,
-  "NpcDefinitions": 12620,
+  "NpcDefinitions": 12639,
   "RuntimeSemanticRoundTripVerified": true,
   "Locales": [
     {
       "Language": "en-US",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "086ef32791fff343a06e2c8f4749a41f9a9d5661aeb8315750d1bff3ec2c4876"
+      "Sha256": "b7cfa2969985214c2ab0d7933acd074e6cea406b4d147db5dcf7d5445aabb3da"
     },
     {
       "Language": "ko-KR",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "766dd2a190a9a297fffe790217e1227d8822f9d6c4a2d5861c7c141d883d7f23"
+      "Sha256": "d3a85744c60507e153a6a10787c62f0c0289309b6cd5b2987ccbf9c9db423573"
     },
     {
       "Language": "ja-JP",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "62076386b2844dee4e5aecabe2d8b0ec7cd0ce8025066cb61674144b99612b95"
+      "Sha256": "0673945cdc03ebd0a7195b1e5d9d64e73c7e65afc24f42fb383c6026b7909592"
     },
     {
       "Language": "de-DE",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "8c3087c2ac1dcc0fb2391a67fab66be5122caeca8decb3d8f014a9dc9a5ae773"
+      "Sha256": "f80fe97f05fd806d8b463884a9d552a9b2997b6a832125511364ef962e30f204"
     },
     {
       "Language": "fr-FR",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "348bdfdad3579e20f7d0f90a5d70e2d6ff6dbdc0d54638b1a89f50d2318adc7f"
+      "Sha256": "049547d669395de0cdc0c53b5214b1168b6cf44053e695d1b64c720b89c32bf1"
     },
     {
       "Language": "es-ES",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "df6b28b1a2418d707c745ea7b940af569989893e7d19855c96afe1e3688b381d"
+      "Sha256": "3aa84186ca38ed2b375e3b5ddb5f63d0e60dd0ea7763881d6f58186feaf559b9"
     },
     {
       "Language": "pt-BR",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "1f77271797fe53f1fedd88174927f27ece9ecfee014926fbcbece0869c0b4513"
+      "Sha256": "d9df88062591d45c355b8b24262c038b9a72cb9d7dd4cc6405189ab0e32475d1"
     },
     {
       "Language": "ru-RU",
       "Skills": 15541,
-      "Npcs": 12620,
-      "Maps": 823,
+      "Npcs": 12639,
+      "Maps": 824,
       "Servers": 749,
-      "Sha256": "6eebbbb869021d59432be206872f0d804297535c04025ff0297652f4d794a79b"
+      "Sha256": "5d7af6c1942c2f546022359c6caed838f331987c873d6df8b023f34f8089a3cb"
     }
   ]
 }
