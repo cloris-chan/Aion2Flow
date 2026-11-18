@@ -19,9 +19,9 @@ public sealed class ResourcePackTests
 
         Assert.Same(shared, snapshot.Shared);
         Assert.Equal(language, snapshot.Language);
-        Assert.Equal(16_607, snapshot.SkillDefinitions.Count);
-        Assert.Equal(16_607, snapshot.Skills.Count);
-        Assert.Equal(14_421, snapshot.NpcCatalog.Count);
+        Assert.Equal(16_506, snapshot.SkillDefinitions.Count);
+        Assert.Equal(16_506, snapshot.Skills.Count);
+        Assert.Equal(14_443, snapshot.NpcCatalog.Count);
         Assert.True(snapshot.Maps.Count > 600);
         Assert.True(snapshot.ServerNames.Count > 100);
     }
@@ -137,8 +137,8 @@ public sealed class ResourcePackTests
     {
         var runtime = ResourceCatalog.LoadShared().SkillSemanticRuntimeIndex;
 
-        Assert.Equal(17_467, runtime.SkillCount);
-        Assert.Equal(27_678, runtime.SlotCount);
+        Assert.Equal(17_361, runtime.SkillCount);
+        Assert.Equal(27_559, runtime.SlotCount);
         Assert.True(runtime.NodeCount > 50_000);
         Assert.True(runtime.NodeSlotReferenceCount > runtime.SlotCount);
         Assert.True(runtime.TryResolveEffect(101000011, out var directHeal));
@@ -152,6 +152,8 @@ public sealed class ResourcePackTests
 
     [Theory]
     [InlineData(10_003u)]
+    [InlineData(100_044u)]
+    [InlineData(100_054u)]
     [InlineData(300_711u)]
     [InlineData(11_010_011u)]
     [InlineData(11_010_012u)]

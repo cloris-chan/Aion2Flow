@@ -1,22 +1,22 @@
 {
   "ResourceSetId": "purple",
-  "Rows": 877,
+  "Rows": 878,
   "Locales": [
     {
       "Language": "en-US",
-      "VerifiedNames": 845,
+      "VerifiedNames": 846,
       "PriorSourceOverrides": 32,
       "RowsWithoutLocalizedName": []
     },
     {
       "Language": "ko-KR",
-      "VerifiedNames": 845,
+      "VerifiedNames": 846,
       "PriorSourceOverrides": 32,
       "RowsWithoutLocalizedName": []
     },
     {
       "Language": "zh-TW",
-      "VerifiedNames": 845,
+      "VerifiedNames": 846,
       "PriorSourceOverrides": 32,
       "RowsWithoutLocalizedName": []
     }

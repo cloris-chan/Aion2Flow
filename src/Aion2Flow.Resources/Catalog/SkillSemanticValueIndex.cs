@@ -27,7 +27,7 @@ internal sealed class SkillSemanticValueIndex
         "BlockItemCasting", "BlockItemEquipItem", "BlockJump", "BlockLooting", "BlockMoveControl", "BlockMovePosition", "BlockRaidEnter",
         "BlockRotate", "BlockSelfRebirth", "BlockSkill", "BlockSpringboard", "BlockSprint", "BlockTargeting", "BlockTargetSkill",
         "CastingCancel", "CastSkill", "CastSkillByCaster", "CastSkillToCaster", "ChangeJumpZvelocity", "ChangeRelationshipEntity",
-        "CloneSkillEffect", "CondDefenceBlock", "CondDefenceEvade", "CondDefenceMiss", "CondDefenceShieldBlock", "CondDefenceWeaponBlock", "ConvertDamageToMP",
+        "CloneSkillEffect", "CondDefenceBlock", "CondDefenceEvade", "CondDefenceMiss", "CondDefenceShieldBlock", "CondDefenceWeaponBlock", "ConvertDamageToMP", "CubeAddSelect",
         "DamageMultiply", "DamageTransfer", "DecreaseCastingTime", "DecreaseCooltimeByContribute", "DecreaseCooltimeByKill",
         "DecreaseCooltimeBySelfBlock", "DecreaseCooltimeBySelfEvade", "DeletableFear",
         "Dpot", "Dpot_Item", "Dpot_Ratio", "DpotRatio_Item", "EndCastSkill", "EndCastSkillByCaster", "EndCastSkillToCaster", "EndMotion",
