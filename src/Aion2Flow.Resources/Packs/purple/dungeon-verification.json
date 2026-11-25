@@ -1,26 +1,26 @@
 {
   "ResourceSetId": "purple",
-  "Rows": 871,
-  "MapKeyRows": 431,
+  "Rows": 870,
+  "MapKeyRows": 430,
   "SubzoneKeyRows": 93,
   "Locales": [
     {
       "Language": "en-US",
-      "VerifiedNames": 249,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
       "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
     },
     {
       "Language": "ko-KR",
-      "VerifiedNames": 249,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
       "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
     },
     {
       "Language": "zh-TW",
-      "VerifiedNames": 249,
+      "VerifiedNames": 248,
       "PriorSourceOverrides": 2,
       "RowsWithoutAliasDefinition": 314,
       "RowsWithoutLocalizedAlias": []
