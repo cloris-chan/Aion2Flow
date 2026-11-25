@@ -1,62 +1,62 @@
 {
   "Id": "steam",
-  "Revision": "f6ddff5112f6966c5646bd0228151c71cd544229d50b1b6fb7b6e14deb31bde5",
+  "Revision": "b9fe23740cf0cb4b7c9c4ee04b90a20d44146829fc62429a41af65b520d5797a",
   "DefaultLanguage": "en-US",
-  "StringMask": 143,
+  "StringMask": 61,
   "Shared": {
     "Language": "",
     "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.shared.bin",
-    "UncompressedLength": 2684195,
-    "Checksum": 5949163530752889943
+    "UncompressedLength": 2684735,
+    "Checksum": 11904252090966021011
   },
   "Locales": [
     {
       "Language": "de-DE",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.de-DE.bin",
-      "UncompressedLength": 699537,
-      "Checksum": 16715665160837909140
+      "UncompressedLength": 700076,
+      "Checksum": 13891114835095129965
     },
     {
       "Language": "en-US",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.en-US.bin",
-      "UncompressedLength": 641242,
-      "Checksum": 16320890359623512680
+      "UncompressedLength": 642034,
+      "Checksum": 6550164382956753580
     },
     {
       "Language": "es-ES",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.es-ES.bin",
-      "UncompressedLength": 745896,
-      "Checksum": 15182190349088993295
+      "UncompressedLength": 746524,
+      "Checksum": 2929739120274862958
     },
     {
       "Language": "fr-FR",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.fr-FR.bin",
-      "UncompressedLength": 735672,
-      "Checksum": 13340742565212791169
+      "UncompressedLength": 736275,
+      "Checksum": 11446176502190321603
     },
     {
       "Language": "ja-JP",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.ja-JP.bin",
-      "UncompressedLength": 721970,
-      "Checksum": 7547429948684154685
+      "UncompressedLength": 722819,
+      "Checksum": 12250105504840991216
     },
     {
       "Language": "ko-KR",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.ko-KR.bin",
-      "UncompressedLength": 690530,
-      "Checksum": 6776757211987039980
+      "UncompressedLength": 691329,
+      "Checksum": 3237232187220539753
     },
     {
       "Language": "pt-BR",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.pt-BR.bin",
-      "UncompressedLength": 734530,
-      "Checksum": 9906324940967275287
+      "UncompressedLength": 735169,
+      "Checksum": 1166303724007065329
     },
     {
       "Language": "ru-RU",
       "ResourceName": "Cloris.Aion2Flow.Resources.Packs.steam.ru-RU.bin",
-      "UncompressedLength": 1052359,
-      "Checksum": 15056047206501526225
+      "UncompressedLength": 1053170,
+      "Checksum": 1335427454198376516
     }
   ]
 }
