@@ -1,0 +1,336 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:clients="clr-namespace:Cloris.Aion2Flow.Clients;assembly=Aion2Flow.Clients"
+        xmlns:hotkeys="clr-namespace:Cloris.Aion2Flow.Services.Hotkeys"
+        xmlns:markups="clr-namespace:Cloris.Aion2Flow.Markups"
+        xmlns:model="clr-namespace:Cloris.Aion2Flow.SceneRuntime.Model;assembly=Aion2Flow.SceneRuntime"
+        xmlns:pres="clr-namespace:Cloris.Aion2Flow.Presentation"
+        xmlns:settings="clr-namespace:Cloris.Aion2Flow.Services.Settings"
+        xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
+        xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
+        x:Class="Cloris.Aion2Flow.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Classes="AppWindow"
+        Width="810"
+        Height="630"
+        MinWidth="680"
+        MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        Title="{markups:Translate Settings_Title}"
+        Icon="/Assets/Images/Aion2Flow.png">
+    <TabControl x:Name="CategoryTabs"
+                Classes="SettingsNavigation"
+                TabStripPlacement="Left"
+                SelectedIndex="0"
+                SelectionChanged="CategoryChanged">
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_Category_Display}">
+            <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Classes="SettingsPage">
+                    <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_Category_Display}" />
+
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,156,44" ColumnSpacing="10">
+                                <TextBlock x:Name="UiScaleLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_UiScale}" />
+                                <Slider x:Name="UiScaleSlider"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.LabeledBy="{Binding #UiScaleLabel}"
+                                        Minimum="50" Maximum="200"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        Value="{Binding UiScalePercent, Mode=OneWay}"
+                                        KeyUp="UiScaleSliderKeyUp" />
+                                <TextBlock Grid.Column="2" Classes="SettingsValue"
+                                           TextAlignment="Right"
+                                           Text="{Binding #UiScaleSlider.Value, StringFormat='{}{0:F0}%'}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="TopmostLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_Topmost}" />
+                                <ComboBox x:Name="TopmostChoice" Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #TopmostLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding TopmostMode, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static vm:TopmostMode.GameForeground}" Content="{markups:Translate Settings_Topmost_GameForeground}" />
+                                    <ComboBoxItem Tag="{x:Static vm:TopmostMode.Always}" Content="{markups:Translate Settings_Topmost_Always}" />
+                                    <ComboBoxItem Tag="{x:Static vm:TopmostMode.Never}" Content="{markups:Translate Settings_Topmost_Never}" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="VisibleRowsLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_VisibleRows}" />
+                                <ComboBox x:Name="VisibleRowsChoice" Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #VisibleRowsLabel}"
+                                          ItemsSource="{Binding RowCountOptions}"
+                                          SelectedItem="{Binding MaxVisibleCombatantRows, Mode=TwoWay}" />
+                            </Grid>
+                            <CheckBox Content="{markups:Translate Settings_FocusStatusBar}"
+                                      IsChecked="{Binding ShowFocusStatusBar, Mode=TwoWay}" />
+                            <CheckBox x:Name="HideHeaderToggle"
+                                      Content="{markups:Translate Settings_ClickThroughTitleBar}"
+                                      IsChecked="{Binding HideHeaderWhenClickThrough, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="SettingsGroupTitle" Text="{markups:Translate Settings_PlayerNameSettings}" />
+                            <CheckBox Content="{markups:Translate Settings_ShowPlayerNames}"
+                                      IsChecked="{Binding ShowPlayerNames, Mode=TwoWay}" />
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="SelfMarkerLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_PlayerSelfMarker}" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #SelfMarkerLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding PlayerSelfMarkerDisplayMode, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static settings:PlayerSelfMarkerDisplayMode.Always}" Content="{markups:Translate Settings_PlayerSelfMarker_Always}" />
+                                    <ComboBoxItem Tag="{x:Static settings:PlayerSelfMarkerDisplayMode.WhenNamesHidden}" Content="{markups:Translate Settings_PlayerSelfMarker_WhenNamesHidden}" />
+                                    <ComboBoxItem Tag="{x:Static settings:PlayerSelfMarkerDisplayMode.Hidden}" Content="{markups:Translate Settings_PlayerSelfMarker_Hidden}" />
+                                </ComboBox>
+                            </Grid>
+                            <CheckBox Content="{markups:Translate Settings_PlayerShortServerName}"
+                                      IsChecked="{Binding ShowPlayerShortServerName, Mode=TwoWay}" />
+                            <CheckBox Content="{markups:Translate Settings_PlayerLegionName}"
+                                      IsChecked="{Binding ShowPlayerLegionName, Mode=TwoWay}" />
+                            <CheckBox Content="{markups:Translate Settings_PlayerFactionTint}"
+                                      IsChecked="{Binding TintPlayerNamesByFaction, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_Category_Combat}">
+            <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Classes="SettingsPage">
+                    <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_Category_Combat}" />
+
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="ScopeLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_CombatantStatisticsScope}" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #ScopeLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding CombatantStatisticsScope, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static model:CombatantStatisticsScope.Self}" Content="{markups:Translate Settings_CombatantStatisticsScope_Self}" />
+                                    <ComboBoxItem Tag="{x:Static model:CombatantStatisticsScope.Party}" Content="{markups:Translate Settings_CombatantStatisticsScope_Party}" />
+                                    <ComboBoxItem Tag="{x:Static model:CombatantStatisticsScope.Force}" Content="{markups:Translate Settings_CombatantStatisticsScope_Force}" />
+                                    <ComboBoxItem Tag="{x:Static model:CombatantStatisticsScope.All}" Content="{markups:Translate Settings_CombatantStatisticsScope_All}" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="SortMetricLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_CombatantSortMetric}" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #SortMetricLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding CombatantSortMetric, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static vm:CombatantSortMetric.DamagePerSecond}" Content="{markups:Translate Settings_CombatantSortMetric_DamagePerSecond}" />
+                                    <ComboBoxItem Tag="{x:Static vm:CombatantSortMetric.TotalDamage}" Content="{markups:Translate Settings_CombatantSortMetric_TotalDamage}" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="SceneModeLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_SceneKind}" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #SceneModeLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding SceneKind, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static model:SceneKind.Standard}" Content="{markups:Translate Settings_SceneKind_Standard}" />
+                                    <ComboBoxItem Tag="{x:Static model:SceneKind.Boss}" Content="{markups:Translate Settings_SceneKind_Boss}" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="TimeFormatLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_TimeDisplayFormat}" />
+                                <ComboBox Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #TimeFormatLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding EncounterTimeDisplayFormat, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static pres:EncounterTimeDisplayFormat.DecimalSeconds}" Content="{markups:Translate Settings_TimeDisplayFormat_DecimalSeconds}" />
+                                    <ComboBoxItem Tag="{x:Static pres:EncounterTimeDisplayFormat.MinutesSeconds}" Content="{markups:Translate Settings_TimeDisplayFormat_MinutesSeconds}" />
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="SettingsGroupTitle" Text="{markups:Translate Settings_MainMetricVisibility}" />
+                            <CheckBox Content="{markups:Translate Settings_MainMetricVisibility_DamagePerSecond}"
+                                      IsChecked="{Binding ShowDamagePerSecondColumn, Mode=TwoWay}" />
+                            <CheckBox Content="{markups:Translate Settings_MainMetricVisibility_Damage}"
+                                      IsChecked="{Binding ShowDamageColumn, Mode=TwoWay}" />
+                            <CheckBox Content="{markups:Translate Settings_MainMetricVisibility_TotalDamagePerSecond}"
+                                      IsChecked="{Binding ShowTotalDamagePerSecond, Mode=TwoWay}" />
+                            <CheckBox Content="{markups:Translate Settings_MainMetricsCompact}"
+                                      IsChecked="{Binding UseCompactMainMetrics, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_SkillMonitor}">
+            <Grid Classes="SettingsPage" RowDefinitions="Auto,Auto,*" RowSpacing="14">
+                <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_SkillMonitor}" />
+                <CheckBox Grid.Row="1"
+                          Content="{markups:Translate Settings_SkillMonitor_Enable}"
+                          IsChecked="{Binding SkillMonitorEnabled, Mode=TwoWay}" />
+                <views:SkillMonitorSettingsView x:Name="MonitorConfiguration" Grid.Row="2"
+                                                Loaded="SkillMonitorSettingsLoaded" />
+            </Grid>
+        </TabItem>
+
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_Category_Hotkeys}">
+            <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Classes="SettingsPage">
+                    <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_Category_Hotkeys}" />
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Border x:Name="BattleResetHotkeyEditor"
+                                        Classes="SettingsHotkeyEditor"
+                                        Focusable="True"
+                                        AutomationProperties.Name="{markups:Translate Settings_Hotkey_BattleReset}"
+                                        Tag="{x:Static hotkeys:GlobalHotkeyAction.BattleReset}"
+                                        PointerPressed="HotkeyEditorPressed"
+                                        KeyDown="HotkeyEditorKeyDown"
+                                        LostFocus="HotkeyEditorLostFocus">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <TextBlock Classes="SettingsLabel" Text="{markups:Translate Settings_Hotkey_BattleReset}" />
+                                        <TextBlock Grid.Column="1" Classes="SettingsValue" Text="{Binding ResetHotkeyDisplay}" />
+                                    </Grid>
+                                </Border>
+                                <Button Grid.Column="1"
+                                        Classes="AppIconButton SettingsClearHotkey"
+                                        Command="{Binding ClearHotkeyCommand}"
+                                        CommandParameter="{x:Static hotkeys:GlobalHotkeyAction.BattleReset}"
+                                        IsEnabled="{Binding HasResetHotkey}"
+                                        AutomationProperties.Name="{markups:Translate Settings_Hotkey_Clear}"
+                                        ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">
+                                    <Path Classes="Glyph GlyphLg" Data="{StaticResource x}" />
+                                </Button>
+                            </Grid>
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <Border x:Name="OverlayHotkeyEditor"
+                                        Classes="SettingsHotkeyEditor"
+                                        Focusable="True"
+                                        AutomationProperties.Name="{markups:Translate Settings_DisplayModeHotkey}"
+                                        Tag="{x:Static hotkeys:GlobalHotkeyAction.CycleOverlayInteraction}"
+                                        PointerPressed="HotkeyEditorPressed"
+                                        KeyDown="HotkeyEditorKeyDown"
+                                        LostFocus="HotkeyEditorLostFocus">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <TextBlock Classes="SettingsLabel" Text="{markups:Translate Settings_DisplayModeHotkey}" />
+                                        <TextBlock Grid.Column="1" Classes="SettingsValue" Text="{Binding OverlayInteractionHotkeyDisplay}" />
+                                    </Grid>
+                                </Border>
+                                <Button Grid.Column="1"
+                                        Classes="AppIconButton SettingsClearHotkey"
+                                        Command="{Binding ClearHotkeyCommand}"
+                                        CommandParameter="{x:Static hotkeys:GlobalHotkeyAction.CycleOverlayInteraction}"
+                                        IsEnabled="{Binding HasOverlayInteractionHotkey}"
+                                        AutomationProperties.Name="{markups:Translate Settings_Hotkey_Clear}"
+                                        ToolTip.Tip="{markups:Translate Settings_Hotkey_Clear}">
+                                    <Path Classes="Glyph GlyphLg" Data="{StaticResource x}" />
+                                </Button>
+                            </Grid>
+                            <TextBlock Classes="SettingsHint SettingsWarning"
+                                       Text="{Binding HotkeyRegistrationErrorText}"
+                                       IsVisible="{Binding HasHotkeyRegistrationError}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_Category_ClientLanguage}">
+            <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Classes="SettingsPage">
+                    <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_Category_ClientLanguage}" />
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="ClientLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_ClientVersion}" />
+                                <ComboBox x:Name="ClientChoice" Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #ClientLabel}"
+                                          SelectedValueBinding="{CompiledBinding Tag, DataType=ComboBoxItem}"
+                                          SelectedValue="{Binding SelectedClientVersion, Mode=TwoWay}">
+                                    <ComboBoxItem Tag="{x:Static clients:ClientVersion.Purple}" Content="{markups:Translate Settings_ClientVersion_Purple}" />
+                                    <ComboBoxItem Tag="{x:Static clients:ClientVersion.Steam}" Content="{markups:Translate Settings_ClientVersion_Steam}" />
+                                </ComboBox>
+                            </Grid>
+                            <TextBlock Classes="SettingsHint"
+                                       Text="{markups:Translate Settings_ClientVersion_ChangeHint}" />
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="LanguageLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_Language}" />
+                                <ComboBox x:Name="LanguageChoice" Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #LanguageLabel}"
+                                          ItemsSource="{Binding Languages}"
+                                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                                          DisplayMemberBinding="{CompiledBinding DisplayName, DataType=vm:LanguageOption}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,210" ColumnSpacing="10">
+                                <TextBlock x:Name="ResourceLanguageLabel" Classes="SettingsLabel"
+                                           Text="{markups:Translate Settings_ResourceLanguage}" />
+                                <ComboBox x:Name="ResourceLanguageChoice" Grid.Column="1"
+                                          Classes="SettingsChoice"
+                                          AutomationProperties.LabeledBy="{Binding #ResourceLanguageLabel}"
+                                          ItemsSource="{Binding ResourceLanguages}"
+                                          SelectedItem="{Binding SelectedResourceLanguage, Mode=TwoWay}"
+                                          DisplayMemberBinding="{CompiledBinding DisplayName, DataType=vm:LanguageOption}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <TabItem Classes="SettingsCategory" Header="{markups:Translate Settings_Category_Updates}">
+            <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Classes="SettingsPage">
+                    <TextBlock Classes="SettingsPageTitle" Text="{markups:Translate Settings_Category_Updates}" />
+                    <Border Classes="SettingsGroup">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="SettingsGroupTitle" Text="{Binding CurrentVersionText}" />
+                            <StackPanel Spacing="10" IsVisible="{Binding IsUpdateSectionVisible}">
+                                <TextBlock Classes="SettingsHint"
+                                           Text="{Binding UpdateStatusText}"
+                                           IsVisible="{Binding UpdateStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <ProgressBar Minimum="0" Maximum="100"
+                                             Value="{Binding DownloadProgress}"
+                                             IsIndeterminate="{Binding IsCheckingUpdate}"
+                                             IsVisible="{Binding IsBusyOrChecking}" />
+                                <Button Classes="AppButton" HorizontalAlignment="Left"
+                                        Command="{Binding CheckForUpdatesCommand}"
+                                        IsVisible="{Binding CanCheckForUpdates}"
+                                        Content="{markups:Translate Settings_Update_Check}" />
+                                <Button Classes="AppButton" HorizontalAlignment="Left"
+                                        Command="{Binding RestartCommand}"
+                                        IsVisible="{Binding CanRestartToUpdate}"
+                                        Content="{markups:Translate Settings_Update_Restart}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+    </TabControl>
+</Window>

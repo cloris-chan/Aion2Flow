@@ -1342,7 +1342,7 @@ public sealed class MainViewModelCombatantFilterTests
 
         public MainViewModel ViewModel { get; }
         public WinDivertCaptureService Capture => _captureService;
-        public SettingsFlyoutViewModel Settings => ViewModel.SettingsFlyout;
+        public SettingsViewModel Settings => ViewModel.Settings;
         public EncounterArchiveService Archive { get; }
         public RuntimeMetadataRegistry MetadataRegistry => _captureService.Scene.Owner.MetadataRegistry;
         public ProjectionCacheStats ProjectionCacheStats => _captureService.Scene.Owner.ProjectionCacheStats;
@@ -1368,7 +1368,7 @@ public sealed class MainViewModelCombatantFilterTests
             var details = new CombatantDetailsFlyoutViewModel(localization, frameBatch);
             var playerNameDisplay = new PlayerNameDisplayService(settings, localization);
             var uiScale = new UiScaleService(settings);
-            var settingsViewModel = new SettingsFlyoutViewModel(localization, language, settings, playerNameDisplay, uiScale, new AppUpdateService(), new ProcessForegroundWatcher(), new GlobalHotkeyService(), new ClientSettingsService(settings, language));
+            var settingsViewModel = new SettingsViewModel(localization, language, settings, playerNameDisplay, uiScale, new AppUpdateService(), new ProcessForegroundWatcher(), new GlobalHotkeyService(), new ClientSettingsService(settings, language));
             var viewModel = new MainViewModel(capture, ports, language, resources, archive, details, localization, settingsViewModel, frameBatch);
             return new MainViewModelFixture(viewModel, capture, archive, frameBatch);
         }

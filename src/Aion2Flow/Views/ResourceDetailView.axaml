@@ -10,10 +10,6 @@
         <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
     </UserControl.Resources>
 
-    <UserControl.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
-    </UserControl.Styles>
-
     <Border x:Name="ResourceSummaryCard"
             Classes="DetailSummaryCard">
         <StackPanel Orientation="Vertical"

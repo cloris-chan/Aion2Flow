@@ -21,6 +21,11 @@
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>Настройки</value></data>
+  <data name="Settings_Category_Display" xml:space="preserve"><value>Оверлей и отображение</value></data>
+  <data name="Settings_Category_Combat" xml:space="preserve"><value>Боевая статистика</value></data>
+  <data name="Settings_Category_Hotkeys" xml:space="preserve"><value>Горячие клавиши</value></data>
+  <data name="Settings_Category_ClientLanguage" xml:space="preserve"><value>Клиент и язык</value></data>
+  <data name="Settings_Category_Updates" xml:space="preserve"><value>Версия и обновления</value></data>
   <data name="Settings_Topmost" xml:space="preserve"><value>Поверх окон</value></data>
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>Когда игра активна</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>Всегда</value></data>
@@ -32,42 +37,23 @@
   <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>Столбец DPS</value></data>
   <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>Столбец общего урона</value></data>
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>Суммарный DPS внизу</value></data>
-  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>Показать</value></data>
-  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>Скрыть</value></data>
   <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>Формат времени</value></data>
   <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
   <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>Сокращать числа</value></data>
-  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>Вкл.</value></data>
-  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>Выкл.</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>Строка состояния цели</value></data>
-  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>Вкл.</value></data>
-  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>Выкл.</value></data>
-  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Заголовок при пропуске кликов</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>Скрыть</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>Показать</value></data>
-  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Отображение имён</value></data>
-  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>Показать</value></data>
-  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>Скрыть</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Скрывать строку заголовка при пропуске кликов</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Показывать имена игроков</value></data>
   <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>Имена игроков</value></data>
   <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>Метка своего персонажа</value></data>
   <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>Выкл.</value></data>
   <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>Если имена скрыты</value></data>
   <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>Всегда</value></data>
   <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>Название сервера</value></data>
-  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>Показать</value></data>
-  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>Скрыть</value></data>
   <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Название легиона</value></data>
-  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>Показать</value></data>
-  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>Скрыть</value></data>
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Цвет по расе</value></data>
-  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>Вкл.</value></data>
-  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Выкл.</value></data>
   <data name="Settings_SkillMonitor" xml:space="preserve"><value>Монитор умений</value></data>
   <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>Включить</value></data>
-  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>Настроить монитор умений</value></data>
-  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>Вкл.</value></data>
-  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>Выкл.</value></data>
   <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>Выбрать всё</value></data>
   <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>Снять выбор</value></data>
   <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Длительность усилений</value></data>

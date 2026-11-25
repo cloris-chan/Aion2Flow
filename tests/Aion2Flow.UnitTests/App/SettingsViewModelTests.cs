@@ -7,7 +7,7 @@ using Cloris.Aion2Flow.ViewModels;
 
 namespace Cloris.Aion2Flow.Tests.App;
 
-public sealed class SettingsFlyoutViewModelTests
+public sealed class SettingsViewModelTests
 {
     [Fact]
     public void UnsupportedPersistedClientIsRejectedBeforeSessionSelection()
@@ -274,7 +274,7 @@ public sealed class SettingsFlyoutViewModelTests
         Assert.False(viewModel.HasOverlayInteractionHotkey);
     }
 
-    private static HotkeyDefinition? GetHotkey(SettingsFlyoutViewModel viewModel, GlobalHotkeyAction action) => action switch
+    private static HotkeyDefinition? GetHotkey(SettingsViewModel viewModel, GlobalHotkeyAction action) => action switch
     {
         GlobalHotkeyAction.BattleReset => viewModel.BattleResetHotkey,
         GlobalHotkeyAction.CycleOverlayInteraction => viewModel.OverlayInteractionHotkey,
@@ -319,7 +319,7 @@ public sealed class SettingsFlyoutViewModelTests
             _processForegroundWatcher = new ProcessForegroundWatcher();
             HotkeyPlatform = new TestGlobalHotkeyPlatform();
             HotkeyService = new GlobalHotkeyService(HotkeyPlatform);
-            ViewModel = new SettingsFlyoutViewModel(
+            ViewModel = new SettingsViewModel(
                 _localization,
                 language,
                 settings,
@@ -337,7 +337,7 @@ public sealed class SettingsFlyoutViewModelTests
 
         public GlobalHotkeyService HotkeyService { get; }
 
-        public SettingsFlyoutViewModel ViewModel { get; }
+        public SettingsViewModel ViewModel { get; }
 
         public void Dispose()
         {

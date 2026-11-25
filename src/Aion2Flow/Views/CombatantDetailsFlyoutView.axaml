@@ -4,10 +4,6 @@
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsFlyoutView"
              x:DataType="vm:CombatantDetailsFlyoutViewModel">
-    <UserControl.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
-    </UserControl.Styles>
-
     <Border x:Name="RootCard"
             Classes="DetailFlyoutCard"
             Width="920"

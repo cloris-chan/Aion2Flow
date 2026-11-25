@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
@@ -15,11 +14,6 @@ public sealed class OverlayLayoutTests
     {
         AvaloniaTestHost.Run(() =>
         {
-            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
-            {
-                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
-            };
-            Application.Current!.Styles.Add(style);
             var header = new Border();
             header.Classes.Add("MainHudHeader");
             var pinSlot = new Border
@@ -86,7 +80,6 @@ public sealed class OverlayLayoutTests
             {
                 window.Close();
                 Dispatcher.UIThread.RunJobs();
-                Application.Current.Styles.Remove(style);
             }
         });
     }
@@ -96,11 +89,6 @@ public sealed class OverlayLayoutTests
     {
         AvaloniaTestHost.Run(() =>
         {
-            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
-            {
-                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
-            };
-            Application.Current!.Styles.Add(style);
             var timer = new DurationBlock();
             timer.Classes.Add("BottomBarMetric");
             var window = new Window { Content = timer };
@@ -126,7 +114,6 @@ public sealed class OverlayLayoutTests
             {
                 window.Close();
                 Dispatcher.UIThread.RunJobs();
-                Application.Current.Styles.Remove(style);
             }
         });
     }

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using Avalonia.Threading;
@@ -13,7 +12,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Cloris.Aion2Flow.ViewModels;
 
-public sealed partial class SettingsFlyoutViewModel : ObservableObject
+public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly LanguageService _languageService;
     private readonly ClientSettingsService _clientSettings;
@@ -27,7 +26,7 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     private bool _hasObservedHotkeyRegistrationState;
     private bool _isHotkeyRegistrationWindowAttached;
 
-    public SettingsFlyoutViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService, ClientSettingsService clientSettings)
+    public SettingsViewModel(LocalizationService localization, LanguageService languageService, SettingsService settingsService, PlayerNameDisplayService playerNameDisplay, UiScaleService uiScale, AppUpdateService updateService, ProcessForegroundWatcher processForegroundWatcher, GlobalHotkeyService globalHotkeyService, ClientSettingsService clientSettings)
     {
         Localization = localization;
         _languageService = languageService;
@@ -88,8 +87,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
             OverlayInteractionHotkey = null;
         }
 
-        foreach (var language in LanguageService.SupportedLanguages)
-            Languages.Add(new LanguageOption(language, CultureInfo.GetCultureInfo(language).NativeName));
         SelectCurrentInterfaceLanguage();
         SelectedClientVersion = _clientSettings.CurrentProfile.Version;
         RebuildResourceLanguageOptions();
@@ -104,28 +101,15 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public LocalizationService Localization { get; }
 
-    public ObservableCollection<LanguageOption> Languages { get; } = [];
-    public ObservableCollection<LanguageOption> ResourceLanguages { get; } = [];
-    public IReadOnlyList<ClientVersion> ClientVersionOptions { get; } = ClientProfiles.Supported.Select(static profile => profile.Version).ToArray();
+    public IReadOnlyList<LanguageOption> Languages { get; } = CreateLanguageOptions(LanguageService.SupportedLanguages);
 
-    public IReadOnlyList<TopmostMode> TopmostModeOptions { get; } = [TopmostMode.GameForeground, TopmostMode.Always, TopmostMode.Never];
+    [ObservableProperty]
+    public partial IReadOnlyList<LanguageOption> ResourceLanguages { get; private set; } = [];
 
     public IReadOnlyList<int> RowCountOptions { get; } = [5, 6, 7, 8, 9, 10];
 
-    public IReadOnlyList<CombatantSortMetric> CombatantSortMetricOptions { get; } = [CombatantSortMetric.DamagePerSecond, CombatantSortMetric.TotalDamage];
-
-    public IReadOnlyList<CombatantStatisticsScope> CombatantStatisticsScopeOptions { get; } = [CombatantStatisticsScope.Self, CombatantStatisticsScope.Party, CombatantStatisticsScope.Force, CombatantStatisticsScope.All];
-
-    public IReadOnlyList<SceneKind> SceneKindOptions { get; } = [SceneKind.Standard, SceneKind.Boss];
-
-    public IReadOnlyList<EncounterTimeDisplayFormat> EncounterTimeDisplayFormatOptions { get; } =
-        [EncounterTimeDisplayFormat.DecimalSeconds, EncounterTimeDisplayFormat.MinutesSeconds];
-
-    public IReadOnlyList<PlayerSelfMarkerDisplayMode> PlayerSelfMarkerDisplayModeOptions { get; } = [PlayerSelfMarkerDisplayMode.Always, PlayerSelfMarkerDisplayMode.WhenNamesHidden, PlayerSelfMarkerDisplayMode.Hidden];
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAlwaysOnTop))]
-    [NotifyPropertyChangedFor(nameof(TopmostModeDisplay))]
     public partial TopmostMode TopmostMode { get; set; } = TopmostMode.GameForeground;
 
     [ObservableProperty]
@@ -133,90 +117,66 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     public partial bool IsTopMost { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(MaxVisibleCombatantRowsDisplay))]
     public partial int MaxVisibleCombatantRows { get; set; } = 5;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CombatantSortMetricDisplay))]
     public partial CombatantSortMetric CombatantSortMetric { get; set; } = CombatantSortMetric.DamagePerSecond;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CombatantStatisticsScopeDisplay))]
     public partial CombatantStatisticsScope CombatantStatisticsScope { get; set; } = CombatantStatisticsScope.All;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SceneKindDisplay))]
     public partial SceneKind SceneKind { get; set; } = SceneKind.Standard;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UseCompactMainMetricsDisplay))]
     public partial bool UseCompactMainMetrics { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowDamagePerSecondColumnDisplay))]
-    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
     public partial bool ShowDamagePerSecondColumn { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowDamageColumnDisplay))]
-    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
     public partial bool ShowDamageColumn { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowTotalDamagePerSecondDisplay))]
-    [NotifyPropertyChangedFor(nameof(MainMetricVisibilityDisplay))]
     public partial bool ShowTotalDamagePerSecond { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(EncounterTimeDisplayFormatDisplay))]
     public partial EncounterTimeDisplayFormat EncounterTimeDisplayFormat { get; set; } = EncounterTimeDisplayFormat.DecimalSeconds;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowFocusStatusBarDisplay))]
     public partial bool ShowFocusStatusBar { get; set; } = true;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HideHeaderWhenClickThroughDisplay))]
     public partial bool HideHeaderWhenClickThrough { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowPlayerNamesDisplay))]
-    [NotifyPropertyChangedFor(nameof(PlayerNameSettingsDisplay))]
     public partial bool ShowPlayerNames { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PlayerSelfMarkerDisplayModeDisplay))]
     public partial PlayerSelfMarkerDisplayMode PlayerSelfMarkerDisplayMode { get; set; } = PlayerSelfMarkerDisplayMode.WhenNamesHidden;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowPlayerShortServerNameDisplay))]
     public partial bool ShowPlayerShortServerName { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowPlayerLegionNameDisplay))]
     public partial bool ShowPlayerLegionName { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TintPlayerNamesByFactionDisplay))]
     public partial bool TintPlayerNamesByFaction { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SkillMonitorEnabledDisplay))]
     public partial bool SkillMonitorEnabled { get; set; } = true;
 
     [ObservableProperty]
     public partial int UiScalePercent { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LanguageDisplay))]
     public partial LanguageOption? SelectedLanguage { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ResourceLanguageDisplay))]
     public partial LanguageOption? SelectedResourceLanguage { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ClientVersionDisplay))]
     public partial ClientVersion SelectedClientVersion { get; set; } = ClientVersion.Purple;
 
     [ObservableProperty]
@@ -281,62 +241,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         _ => IsTopMost
     };
 
-    public string TopmostModeDisplay => Localization[$"Settings_Topmost_{TopmostMode}"];
-
     internal void RefreshTargetProcessForegroundState() => IsTopMost = _processForegroundWatcher.IsTargetProcessForeground();
 
-    public string MaxVisibleCombatantRowsDisplay => MaxVisibleCombatantRows.ToString();
-
-    public string CombatantSortMetricDisplay => Localization[$"Settings_CombatantSortMetric_{CombatantSortMetric}"];
-
-    public string CombatantStatisticsScopeDisplay => Localization[$"Settings_CombatantStatisticsScope_{CombatantStatisticsScope}"];
-
-    public string SceneKindDisplay => Localization[$"Settings_SceneKind_{SceneKind}"];
-
-    public string UseCompactMainMetricsDisplay => Localization[UseCompactMainMetrics ? "Settings_MainMetricsCompact_On" : "Settings_MainMetricsCompact_Off"];
-
-    public string ShowDamagePerSecondColumnDisplay => ResolveMainMetricVisibilityDisplay(ShowDamagePerSecondColumn);
-
-    public string ShowDamageColumnDisplay => ResolveMainMetricVisibilityDisplay(ShowDamageColumn);
-
-    public string ShowTotalDamagePerSecondDisplay => ResolveMainMetricVisibilityDisplay(ShowTotalDamagePerSecond);
-
-    public string MainMetricVisibilityDisplay => $"{Convert.ToInt32(ShowDamagePerSecondColumn) + Convert.ToInt32(ShowDamageColumn) + Convert.ToInt32(ShowTotalDamagePerSecond)}/3";
-
-    public string EncounterTimeDisplayFormatDisplay => Localization[$"Settings_TimeDisplayFormat_{EncounterTimeDisplayFormat}"];
-
-    public string ShowFocusStatusBarDisplay => Localization[ShowFocusStatusBar ? "Settings_FocusStatusBar_On" : "Settings_FocusStatusBar_Off"];
-
-    public string HideHeaderWhenClickThroughDisplay => Localization[HideHeaderWhenClickThrough ? "Settings_HideHeaderWhenClickThrough_On" : "Settings_HideHeaderWhenClickThrough_Off"];
-
-    public string ShowPlayerNamesDisplay => Localization[ShowPlayerNames ? "Settings_ShowPlayerNames_On" : "Settings_ShowPlayerNames_Off"];
-
-    public string PlayerSelfMarkerDisplayModeDisplay => Localization[$"Settings_PlayerSelfMarker_{PlayerSelfMarkerDisplayMode}"];
-
-    public string ShowPlayerShortServerNameDisplay => Localization[ShowPlayerShortServerName ? "Settings_PlayerShortServerName_On" : "Settings_PlayerShortServerName_Off"];
-
-    public string ShowPlayerLegionNameDisplay => Localization[ShowPlayerLegionName ? "Settings_PlayerLegionName_On" : "Settings_PlayerLegionName_Off"];
-
-    public string TintPlayerNamesByFactionDisplay => Localization[TintPlayerNamesByFaction ? "Settings_PlayerFactionTint_On" : "Settings_PlayerFactionTint_Off"];
-
-    public string SkillMonitorEnabledDisplay => Localization[SkillMonitorEnabled ? "Settings_SkillMonitor_On" : "Settings_SkillMonitor_Off"];
-
-    public string PlayerNameSettingsDisplay => ShowPlayerNamesDisplay;
-
-    public string LanguageDisplay => SelectedLanguage?.DisplayName ?? string.Empty;
-    public string ResourceLanguageDisplay => SelectedResourceLanguage?.DisplayName ?? string.Empty;
-    public string ClientVersionDisplay => ResolveClientVersionDisplay(SelectedClientVersion);
-
-    public string ResolveClientVersionDisplay(ClientVersion version) => version switch
-    {
-        ClientVersion.Purple => Localization["Settings_ClientVersion_Purple"],
-        ClientVersion.Steam => Localization["Settings_ClientVersion_Steam"],
-        _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported game client version.")
-    };
-
     public bool IsUpdateSectionVisible => _updateService.IsManagedByVelopack;
-
-    public string? CurrentVersion => _updateService.CurrentVersion;
 
     public AppUpdateState UpdateState => _updateService.State;
 
@@ -364,16 +271,9 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         _ => string.Empty
     };
 
-    public string CurrentVersionText
-    {
-        get
-        {
-            var version = CurrentVersion;
-            return string.IsNullOrWhiteSpace(version)
-                ? string.Empty
-                : string.Format(Localization["Settings_Update_CurrentVersionFormat"], version);
-        }
-    }
+    public string CurrentVersionText => string.Format(
+        Localization["Settings_Update_CurrentVersionFormat"],
+        _updateService.CurrentVersion ?? typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3));
 
     [RelayCommand(CanExecute = nameof(CanCheckForUpdates))]
     private void CheckForUpdates() => _updateService.CheckForUpdates();
@@ -441,14 +341,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
     {
         _uiScale.SetScalePercent(value);
         PersistSettings();
-    }
-
-    public void SetUiScalePercent(int percent)
-    {
-        if (UiScalePercent != percent)
-            UiScalePercent = percent;
-        else
-            _uiScale.SetScalePercent(percent);
     }
 
     partial void OnSelectedLanguageChanged(LanguageOption? value)
@@ -656,28 +548,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     private void OnLocalizationLanguageChanged(object? sender, EventArgs e)
     {
-        OnPropertyChanged(nameof(TopmostModeDisplay));
-        OnPropertyChanged(nameof(CombatantSortMetricDisplay));
-        OnPropertyChanged(nameof(CombatantStatisticsScopeDisplay));
-        OnPropertyChanged(nameof(SceneKindDisplay));
-        OnPropertyChanged(nameof(UseCompactMainMetricsDisplay));
-        OnPropertyChanged(nameof(ShowDamagePerSecondColumnDisplay));
-        OnPropertyChanged(nameof(ShowDamageColumnDisplay));
-        OnPropertyChanged(nameof(ShowTotalDamagePerSecondDisplay));
-        OnPropertyChanged(nameof(MainMetricVisibilityDisplay));
-        OnPropertyChanged(nameof(EncounterTimeDisplayFormatDisplay));
-        OnPropertyChanged(nameof(ShowFocusStatusBarDisplay));
-        OnPropertyChanged(nameof(HideHeaderWhenClickThroughDisplay));
-        OnPropertyChanged(nameof(ShowPlayerNamesDisplay));
-        OnPropertyChanged(nameof(PlayerSelfMarkerDisplayModeDisplay));
-        OnPropertyChanged(nameof(ShowPlayerShortServerNameDisplay));
-        OnPropertyChanged(nameof(ShowPlayerLegionNameDisplay));
-        OnPropertyChanged(nameof(TintPlayerNamesByFactionDisplay));
-        OnPropertyChanged(nameof(SkillMonitorEnabledDisplay));
-        OnPropertyChanged(nameof(PlayerNameSettingsDisplay));
-        OnPropertyChanged(nameof(LanguageDisplay));
-        OnPropertyChanged(nameof(ResourceLanguageDisplay));
-        OnPropertyChanged(nameof(ClientVersionDisplay));
         OnPropertyChanged(nameof(UpdateStatusText));
         OnPropertyChanged(nameof(CurrentVersionText));
         OnPropertyChanged(nameof(ResetHotkeyDisplay));
@@ -685,18 +555,18 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
         OnPropertyChanged(nameof(HotkeyRegistrationErrorText));
     }
 
-    private string ResolveMainMetricVisibilityDisplay(bool isVisible) => Localization[isVisible ? "Settings_MainMetricVisibility_Show" : "Settings_MainMetricVisibility_Hide"];
-
     private void SelectCurrentInterfaceLanguage()
         => SelectedLanguage = Languages.First(option => option.Code == _languageService.CurrentLanguage);
 
     private void RebuildResourceLanguageOptions()
     {
-        ResourceLanguages.Clear();
-        foreach (var language in _clientSettings.ResourceLanguages)
-            ResourceLanguages.Add(new LanguageOption(language, CultureInfo.GetCultureInfo(language).NativeName));
-        SelectedResourceLanguage = ResourceLanguages.FirstOrDefault(option => option.Code == _clientSettings.ResourceLanguage);
+        var options = CreateLanguageOptions(_clientSettings.ResourceLanguages);
+        ResourceLanguages = options;
+        SelectedResourceLanguage = options.First(option => option.Code == _clientSettings.ResourceLanguage);
     }
+
+    private static LanguageOption[] CreateLanguageOptions(IReadOnlyList<string> languages)
+        => languages.Select(static language => new LanguageOption(language, CultureInfo.GetCultureInfo(language).NativeName)).ToArray();
 
     private void OnUpdatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -709,7 +579,6 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsBusyOrChecking));
                 OnPropertyChanged(nameof(CanCheckForUpdates));
                 OnPropertyChanged(nameof(CanRestartToUpdate));
-                OnPropertyChanged(nameof(ShowCheckButton));
                 OnPropertyChanged(nameof(UpdateStatusText));
                 CheckForUpdatesCommand.NotifyCanExecuteChanged();
                 RestartCommand.NotifyCanExecuteChanged();
@@ -730,5 +599,4 @@ public sealed partial class SettingsFlyoutViewModel : ObservableObject
 
     public bool IsBusyOrChecking => IsCheckingUpdate || IsDownloadingUpdate;
 
-    public bool ShowCheckButton => CanCheckForUpdates;
 }

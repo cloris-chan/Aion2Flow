@@ -15,12 +15,8 @@
         ShowActivated="False"
         ShowInTaskbar="False">
 
-    <Window.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
-    </Window.Styles>
-
     <Button x:Name="PinButton"
-            Classes="BottomBarButton OverlayPinButton"
+            Classes="AppIconButton BottomBarButton OverlayPinButton"
             Click="CycleInteractionMode">
         <Path Classes="Glyph GlyphMd"
               Data="{StaticResource pin}" />

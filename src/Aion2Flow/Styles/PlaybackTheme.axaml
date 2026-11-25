@@ -1,8 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls">
-    <StyleInclude Source="avares://Aion2Flow/Styles/CommonTheme.axaml" />
-
     <Styles.Resources>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineTrack">#060B0F</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.TimelineCombat">#18D7F4</SolidColorBrush>
@@ -17,11 +15,6 @@
         <SolidColorBrush x:Key="PlaybackBrush.TimelineOther">#D4DCE5</SolidColorBrush>
         <SolidColorBrush x:Key="PlaybackBrush.Positive">#89D66B</SolidColorBrush>
     </Styles.Resources>
-
-    <Style Selector="Window.PlaybackWindow">
-        <Setter Property="Background" Value="{StaticResource AppBrush.Canvas}" />
-        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
-    </Style>
 
     <Style Selector="Border.PlaybackCommandBar">
         <Setter Property="Background" Value="{StaticResource AppBrush.Band}" />
@@ -102,29 +95,6 @@
         <Setter Property="Height" Value="30" />
         <Setter Property="MinWidth" Value="30" />
         <Setter Property="MinHeight" Value="30" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="2" />
-        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Cursor" Value="Hand" />
-    </Style>
-
-    <Style Selector="Button.PlaybackIconButton:pointerover">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
-    </Style>
-
-    <Style Selector="Button.PlaybackIconButton:pressed">
-        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
-        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.SeparatorStrong}" />
-    </Style>
-
-    <Style Selector="Button.PlaybackIconButton:disabled">
-        <Setter Property="Opacity" Value="0.45" />
     </Style>
 
     <Style Selector="Button.PlaybackIconButton.PlaybackPrimaryButton">
@@ -137,17 +107,7 @@
         <Setter Property="BorderBrush" Value="{StaticResource AppBrush.AccentStrong}" />
     </Style>
 
-    <Style Selector="Path.PlaybackGlyph">
-        <Setter Property="Width" Value="16" />
-        <Setter Property="Height" Value="16" />
-        <Setter Property="Stretch" Value="Uniform" />
-        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
-        <Setter Property="StrokeThickness" Value="2" />
-        <Setter Property="StrokeLineCap" Value="Round" />
-        <Setter Property="StrokeJoin" Value="Round" />
-    </Style>
-
-    <Style Selector="Button.PlaybackPrimaryButton Path.PlaybackGlyph">
+    <Style Selector="Button.PlaybackPrimaryButton Path.Glyph">
         <Setter Property="Stroke" Value="{StaticResource AppBrush.AccentStrong}" />
     </Style>
 

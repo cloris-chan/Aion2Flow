@@ -3,8 +3,6 @@
         xmlns:controls="clr-namespace:Cloris.Aion2Flow.Controls"
         xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
         xmlns:media="clr-namespace:Avalonia.Media;assembly=Avalonia.Base">
-    <StyleInclude Source="avares://Aion2Flow/Styles/CommonTheme.axaml" />
-
     <Styles.Resources>
         <SolidColorBrush x:Key="OverlayBrush.Surface">#26131B25</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.SurfaceSoft">#1C0E141B</SolidColorBrush>
@@ -12,17 +10,12 @@
         <SolidColorBrush x:Key="OverlayBrush.HighlightStrong">#5E8CBDE4</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.Border">#476B859A</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.BorderStrong">#77A6C4DD</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.Text">#F1F6FB</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.TextMuted">#B0C1D0</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.TextSubtle">#8595A2</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.EmptyStateText">#D7E4EF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.RowMetricText">#DEE8F0</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainAccent">#E3C78C</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainHudBackdrop">#A80A0D0F</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainHudContentBackdrop">#780A0D0F</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.MainHudBackdrop" Color="{StaticResource AppColor.Canvas}" Opacity="0.66" />
+        <SolidColorBrush x:Key="OverlayBrush.MainHudContentBackdrop" Color="{StaticResource AppColor.Canvas}" Opacity="0.47" />
         <SolidColorBrush x:Key="OverlayBrush.MainHudPanelHover">#24192225</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.MainHudPanelSelected">#321A2528</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.MainHudGold">#E6D39A</SolidColorBrush>
         <LinearGradientBrush x:Key="OverlayBrush.MainHudFooterSeparator"
                              StartPoint="0%,50%"
                              EndPoint="100%,50%">
@@ -42,7 +35,7 @@
         <SolidColorBrush x:Key="OverlayBrush.DetailHudLineSoft">#38FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailSeparator">#30FFFFFF</SolidColorBrush>
         <SolidColorBrush x:Key="OverlayBrush.DetailDamageShareFill">#C20B5F59</SolidColorBrush>
-        <SolidColorBrush x:Key="OverlayBrush.SettingsBackdrop">#F0060A0D</SolidColorBrush>
+        <SolidColorBrush x:Key="OverlayBrush.MenuBackdrop" Color="{StaticResource AppColor.Canvas}" Opacity="0.94" />
     </Styles.Resources>
 
     <Style Selector="Window.OverlayWindow">
@@ -149,11 +142,11 @@
     </Style>
 
     <Style Selector="TextBlock.OverlayPrimaryText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="TextBlock.OverlayMutedText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
     </Style>
 
     <Style Selector="TextBlock.OverlayEmptyStateText">
@@ -163,7 +156,7 @@
     </Style>
 
     <Style Selector="TextBlock.OverlayCaptionText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
@@ -190,7 +183,7 @@
     </Style>
 
     <Style Selector="controls|NpcDisplay.BossFocusName TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.MainHudGold}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.AccentStrong}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
@@ -205,7 +198,7 @@
     </Style>
 
     <Style Selector="TextBlock.BossFocusCountText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Opacity" Value="0.88" />
@@ -215,7 +208,7 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.BossFocusHp">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -223,7 +216,7 @@
     </Style>
 
     <Style Selector="TextBlock.BossFocusHpMuted">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
@@ -232,7 +225,7 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.BossFocusHpMuted">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Opacity" Value="0.88" />
@@ -276,11 +269,9 @@
     </Style>
 
     <Style Selector="Button.WindowBtn">
-        <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Width" Value="24" />
         <Setter Property="Height" Value="24" />
-        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Opacity" Value="0.65" />
         <Setter Property="Transitions">
             <Transitions>
@@ -289,12 +280,7 @@
         </Setter>
     </Style>
 
-    <Style Selector="Path.Glyph">
-        <Setter Property="Stretch" Value="Uniform" />
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="StrokeThickness" Value="1.4" />
-        <Setter Property="StrokeLineCap" Value="Round" />
-        <Setter Property="StrokeJoin" Value="Round" />
+    <Style Selector="Window.OverlayWindow Path.Glyph">
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Stroke" Duration="0:0:0.18" />
@@ -302,23 +288,8 @@
         </Setter>
     </Style>
 
-    <Style Selector="Path.GlyphSm">
-        <Setter Property="Width" Value="12" />
-        <Setter Property="Height" Value="12" />
-    </Style>
-
-    <Style Selector="Path.GlyphMd">
-        <Setter Property="Width" Value="14" />
-        <Setter Property="Height" Value="14" />
-    </Style>
-
-    <Style Selector="Path.GlyphLg">
-        <Setter Property="Width" Value="16" />
-        <Setter Property="Height" Value="16" />
-    </Style>
-
     <Style Selector="Button.WindowBtn Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="Width" Value="14" />
         <Setter Property="Height" Value="14" />
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
@@ -336,11 +307,11 @@
     </Style>
 
     <Style Selector="Button.WindowBtn:pointerover Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="Button.WindowBtn.active Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="Button.WindowBtn:disabled">
@@ -348,7 +319,7 @@
     </Style>
 
     <Style Selector="Button.WindowBtn:disabled Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextSubtle}" />
     </Style>
 
     <Style Selector="Button.MinBtn Path.Glyph">
@@ -368,7 +339,7 @@
     </Style>
 
     <Style Selector="Button.CloseBtn:pointerover Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="RenderTransform" Value="scale(1.08)" />
     </Style>
 
@@ -377,18 +348,14 @@
     </Style>
 
     <Style Selector="Button.BottomBarButton">
-        <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="4,0" />
         <Setter Property="MinWidth" Value="26" />
         <Setter Property="MinHeight" Value="26" />
         <Setter Property="Opacity" Value="0.72" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.18" />
@@ -397,7 +364,7 @@
     </Style>
 
     <Style Selector="Button.BottomBarButton:disabled Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextSubtle}" />
     </Style>
 
     <Style Selector="Button.BottomBarButton:pointerover">
@@ -409,56 +376,47 @@
         <Setter Property="Background" Value="#24FFFFFF" />
     </Style>
 
-    <Style Selector="Button.BottomBarButton:disabled">
-        <Setter Property="Opacity" Value="0.45" />
-    </Style>
-
     <Style Selector="Button.OverlayPinButton Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextSubtle}" />
     </Style>
 
     <Style Selector="Button.OverlayPinButton.click-through Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="Button.OverlayPinButton.hidden Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.MainHudGold}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.AccentStrong}" />
     </Style>
 
     <Style Selector="Button.FlyoutInlineButton">
-        <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Padding" Value="2" />
         <Setter Property="Margin" Value="6,0,0,0" />
         <Setter Property="Width" Value="18" />
         <Setter Property="Height" Value="18" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="HorizontalContentAlignment" Value="Center" />
-        <Setter Property="VerticalContentAlignment" Value="Center" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
     </Style>
 
     <Style Selector="Button.FlyoutInlineButton Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextMuted}" />
     </Style>
 
     <Style Selector="Button.FlyoutInlineButton:pointerover">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="Button.FlyoutInlineButton:pointerover Path.Glyph">
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="MenuItem.FlyoutMenuItem">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="10" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Padding" Value="9,6" />
@@ -490,7 +448,7 @@
     </Style>
 
     <Style Selector="MenuItem.FlyoutMenuItemPlaceholder:disabled">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="Opacity" Value="1" />
     </Style>
 
@@ -504,28 +462,11 @@
     </Style>
 
     <Style Selector="MenuItem.FlyoutMenuItem /template/ Path#PART_ChevronPath">
-        <Setter Property="Fill" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Fill" Value="{StaticResource AppBrush.TextMuted}" />
     </Style>
 
     <Style Selector="MenuItem.FlyoutMenuItem:open /template/ Path#PART_ChevronPath">
-        <Setter Property="Fill" Value="{StaticResource OverlayBrush.Text}" />
-    </Style>
-
-    <Style Selector="Border.SettingsCard">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.SettingsBackdrop}" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="MinWidth" Value="244" />
-        <Setter Property="ClipToBounds" Value="True" />
-    </Style>
-
-    <Style Selector="Menu.SettingsMenu">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Padding" Value="0" />
-        <Setter Property="Height" Value="NaN" />
+        <Setter Property="Fill" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="MenuItem.FlyoutPanelRow">
@@ -544,171 +485,12 @@
         <Setter Property="Margin" Value="{Binding $parent[MenuItem].Padding}" />
     </Style>
 
-    <Style Selector="MenuItem.SettingsRowItem /template/ Popup#PART_Popup">
-        <Setter Property="Placement" Value="RightEdgeAlignedTop" />
-    </Style>
-
-    <Style Selector="MenuItem.SettingsRowItem /template/ Popup#PART_Popup > Border">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.SettingsBackdrop}" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-
-    <Style Selector="MenuItem.SettingsRowItem /template/ Popup#PART_Popup > Border > ScrollViewer > ItemsPresenter#PART_ItemsPresenter">
-        <Setter Property="Margin" Value="0" />
-    </Style>
-
-    <Style Selector="MenuItem.SettingsOptionItem">
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
-        <Setter Property="BorderThickness" Value="2,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="MinHeight" Value="30" />
-        <Setter Property="Padding" Value="9,6" />
-    </Style>
-
-    <Style Selector="MenuItem.SettingsOptionItem:pointerover">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsRowLabel">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsRowValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Margin" Value="12,0,4,0" />
-    </Style>
-
-    <Style Selector="Border.SettingsScaleRow">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
-        <Setter Property="BorderThickness" Value="2,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="10,7" />
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Margin" Value="0" />
-    </Style>
-
-    <Style Selector="Border.SettingsScaleRow:pointerover">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-    </Style>
-
-    <Style Selector="Slider.SettingsScaleSlider">
-        <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="MinWidth" Value="104" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.BorderStrong}" />
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsScaleValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="MinWidth" Value="42" />
-        <Setter Property="TextAlignment" Value="Right" />
-    </Style>
-
-    <Style Selector="Border.SettingsDivider">
-        <Setter Property="Height" Value="1" />
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-        <Setter Property="Margin" Value="0,6" />
-    </Style>
-
-    <Style Selector="Border.SettingsHotkeyRow">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailSeparator}" />
-        <Setter Property="BorderThickness" Value="2,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="10,7" />
-        <Setter Property="MinHeight" Value="32" />
-        <Setter Property="Margin" Value="0" />
-        <Setter Property="Cursor" Value="Hand" />
-    </Style>
-
-    <Style Selector="Border.SettingsHotkeyRow:pointerover">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-    </Style>
-
-    <Style Selector="Border.SettingsHotkeyRow:focus">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.BorderStrong}" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsHotkeyError">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.MainAccent}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
-        <Setter Property="Margin" Value="10,5,10,7" />
-        <Setter Property="TextWrapping" Value="Wrap" />
-    </Style>
-
-    <Style Selector="Border.SettingsUpdatePanel">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelSoft}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-        <Setter Property="BorderThickness" Value="2,0,0,1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Padding" Value="10,8" />
-        <Setter Property="Margin" Value="0" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsUpdateVersion">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
-    </Style>
-
-    <Style Selector="TextBlock.SettingsUpdateStatus">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
-        <Setter Property="TextWrapping" Value="NoWrap" />
-        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-    </Style>
-
-    <Style Selector="ProgressBar.SettingsUpdateProgress">
-        <Setter Property="Height" Value="4" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.BorderStrong}" />
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-
-    <Style Selector="Button.SettingsUpdateButton">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanel}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.DetailHudLineSoft}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
-        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Padding" Value="10,4" />
-        <Setter Property="MinHeight" Value="24" />
-    </Style>
-
-    <Style Selector="Button.SettingsUpdateButton:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="CornerRadius" Value="0" />
-    </Style>
-
-    <Style Selector="Button.SettingsUpdateButton:disabled">
-        <Setter Property="Opacity" Value="0.45" />
-    </Style>
-
     <Style Selector="MenuFlyoutPresenter.EncounterHistoryMenuFlyout">
-        <Setter Property="Background" Value="{StaticResource OverlayBrush.SettingsBackdrop}" />
+        <Setter Property="Background" Value="{StaticResource OverlayBrush.MenuBackdrop}" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="CornerRadius" Value="0" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="MinWidth" Value="244" />
@@ -730,26 +512,26 @@
     </Style>
 
     <Style Selector="TextBlock.BottomBarText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.BottomBarMetric">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="controls|DurationBlock.BottomBarMetric controls|NumericBlock">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="controls|NumericBlock.BottomBarTotalDps">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
@@ -814,7 +596,7 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.OverlayRowMetricStrong">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -846,19 +628,19 @@
     </Style>
 
     <Style Selector="controls|PcDisplay.DetailHeaderName TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Title}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.DetailHeaderName controls|PcDisplay TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Title}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.DetailHeaderName controls|NpcDisplay TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Title}" />
         <Setter Property="FontWeight" Value="Bold" />
     </Style>
@@ -872,7 +654,7 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="Padding" Value="12,4,12,5" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -914,11 +696,11 @@
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:pointerover">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:checked">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
     </Style>
 
     <Style Selector="ToggleButton.DetailDirectionTab:checked /template/ Border#TabChrome">
@@ -964,7 +746,7 @@
     </Style>
 
     <Style Selector="TextBlock.DetailBannerTitle">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -1050,7 +832,7 @@
     </Style>
 
     <Style Selector="controls|DurationMetricTile.DetailBannerMetric controls|DurationBlock.MetricValue controls|NumericBlock">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
@@ -1146,31 +928,31 @@
     </Style>
 
     <Style Selector="TextBlock.MetricLabel">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricSplitValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style Selector="TextBlock.MetricSplitSlash">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.MetricSplitSecondary">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -1194,7 +976,7 @@
     </Style>
 
     <Style Selector="TextBlock.CounterpartSelectorText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -1205,7 +987,7 @@
         <Setter Property="Width" Value="12" />
         <Setter Property="Height" Value="12" />
         <Setter Property="Stretch" Value="None" />
-        <Setter Property="Stroke" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="StrokeThickness" Value="1.5" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Margin" Value="2,0,0,0" />
@@ -1220,7 +1002,7 @@
     </Style>
 
     <Style Selector="CheckBox.CounterpartSelectAll">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="MinHeight" Value="18" />
@@ -1240,13 +1022,13 @@
                                 CornerRadius="0" />
                         <Path Name="SelectionCheck"
                               Data="M 3.5 8 L 6.5 11 L 12.5 4.5"
-                              Stroke="{StaticResource OverlayBrush.Text}"
+                              Stroke="{StaticResource AppBrush.Text}"
                               StrokeThickness="2"
                               IsVisible="False" />
                         <Border Name="SelectionIndeterminate"
                                 Width="8"
                                 Height="2"
-                                Background="{StaticResource OverlayBrush.Text}"
+                                Background="{StaticResource AppBrush.Text}"
                                 CornerRadius="0"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
@@ -1306,13 +1088,13 @@
                             CornerRadius="0" />
                     <Path Name="SelectionCheck"
                           Data="M 3.5 8 L 6.5 11 L 12.5 4.5"
-                          Stroke="{StaticResource OverlayBrush.Text}"
+                          Stroke="{StaticResource AppBrush.Text}"
                           StrokeThickness="2"
                           IsVisible="False" />
                     <Border Name="SelectionIndeterminate"
                             Width="8"
                             Height="2"
-                            Background="{StaticResource OverlayBrush.Text}"
+                            Background="{StaticResource AppBrush.Text}"
                             CornerRadius="0"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
@@ -1355,7 +1137,7 @@
     </Style>
 
     <Style Selector="TextBlock.CounterpartHeaderText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="TextAlignment" Value="Right" />
@@ -1376,7 +1158,7 @@
     </Style>
 
     <Style Selector="controls|CombatantDisplay.CounterpartName TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -1387,7 +1169,7 @@
     </Style>
 
     <Style Selector="controls|NumericBlock.CounterpartMetricValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="VerticalAlignment" Value="Center" />
@@ -1396,7 +1178,7 @@
     </Style>
 
     <Style Selector="TextBlock.SectionTitle">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Primary}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="Margin" Value="2,0,0,0" />
@@ -1444,7 +1226,7 @@
 
     <Style Selector="Border.SelectableDetailTableRow.selected">
         <Setter Property="Background" Value="{StaticResource OverlayBrush.DetailHudPanelHover}" />
-        <Setter Property="BorderBrush" Value="{StaticResource OverlayBrush.MainAccent}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
     </Style>
 
     <Style Selector="Border.DetailActionPanel">
@@ -1456,7 +1238,7 @@
     </Style>
 
     <Style Selector="TextBlock.DetailActionTitle">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Margin" Value="2,0,0,0" />
@@ -1494,7 +1276,7 @@
     </Style>
 
     <Style Selector="TextBlock.DetailTableHeader">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -1503,7 +1285,7 @@
     </Style>
 
     <Style Selector="TextBlock.DetailTableHeaderLeft">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontWeight" Value="Bold" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
     </Style>
@@ -1515,50 +1297,50 @@
     </Style>
 
     <Style Selector="TextBlock.DetailMetricSlash">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextSubtle}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextSubtle}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Caption}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.DetailMetricValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="TextAlignment" Value="Right" />
     </Style>
 
     <Style Selector="controls|NumericBlock.DetailMetricRate">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.TextMuted}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
     </Style>
 
     <Style Selector="controls|SkillDisplay.DetailRowText TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Margin" Value="0,2" />
     </Style>
 
     <Style Selector="controls|SkillDisplay.DetailActionSkill TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Margin" Value="0,1" />
     </Style>
 
     <Style Selector="controls|CombatantDisplay.DetailActionCombatant TextBlock#PART_Text">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Margin" Value="0,1" />
     </Style>
 
     <Style Selector="TextBlock.DetailActionText">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="controls|NumericBlock.DetailRowValue">
-        <Setter Property="Foreground" Value="{StaticResource OverlayBrush.Text}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
         <Setter Property="Margin" Value="0,2" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />

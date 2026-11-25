@@ -2,7 +2,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
-using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using Cloris.Aion2Flow.Controls;
 using Cloris.Aion2Flow.Presentation;
@@ -241,11 +240,6 @@ public sealed class CombatantDetailsFlyoutLayoutTests
     {
         AvaloniaTestHost.Run(() =>
         {
-            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
-            {
-                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
-            };
-            Application.Current!.Styles.Add(style);
             var row = new Border { Child = new Border { Height = 22 } };
             row.Classes.Add("DetailTableRow");
             row.Classes.Add("SelectableDetailTableRow");
@@ -271,7 +265,6 @@ public sealed class CombatantDetailsFlyoutLayoutTests
             {
                 window.Close();
                 Dispatcher.UIThread.RunJobs();
-                Application.Current.Styles.Remove(style);
             }
         });
     }

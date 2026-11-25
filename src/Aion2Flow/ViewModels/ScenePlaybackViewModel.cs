@@ -33,7 +33,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
     private readonly ScenePlaybackController _controller;
     private readonly PlaybackSeekCoordinator _seekCoordinator;
     private readonly IScenePlaybackSource _source;
-    private readonly SettingsFlyoutViewModel _settings;
+    private readonly SettingsViewModel _settings;
     private SceneCombatSnapshot _sceneDescriptorSnapshot;
     private readonly UiFrameBatchService _frameBatchService;
     private readonly Dictionary<int, EntityVitalState> _vitalScratch = [];
@@ -92,7 +92,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         IScenePlaybackSource source,
         SceneDisplayContext displayContext,
         LocalizationService localization,
-        SettingsFlyoutViewModel settings)
+        SettingsViewModel settings)
         : this(
             source,
             displayContext,
@@ -109,7 +109,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
         LocalizationService localization,
         IScenePlaybackTickSourceFactory tickSourceFactory,
         UiFrameBatchService frameBatchService,
-        SettingsFlyoutViewModel settings)
+        SettingsViewModel settings)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(displayContext);
@@ -2042,7 +2042,7 @@ public sealed partial class ScenePlaybackViewModel : ObservableObject, IAsyncDis
 
     private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat))
+        if (e.PropertyName == nameof(SettingsViewModel.EncounterTimeDisplayFormat))
         {
             CombatantDetails.EncounterTimeDisplayFormat =
                 _settings.EncounterTimeDisplayFormat;

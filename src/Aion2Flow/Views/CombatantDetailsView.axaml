@@ -6,10 +6,6 @@
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatantDetailsView"
              x:DataType="vm:CombatantDetailsFlyoutViewModel">
-    <UserControl.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
-    </UserControl.Styles>
-
     <Grid RowDefinitions="Auto,*"
           RowSpacing="14"
           MinHeight="0"

@@ -15,7 +15,7 @@
                             Orientation="Horizontal"
                             Spacing="2"
                             VerticalAlignment="Center">
-                    <Button Classes="PlaybackBreadcrumbButton"
+                    <Button Classes="AppButton PlaybackBreadcrumbButton"
                             Classes.PlaybackSelected="{Binding IsEventScopeAll}"
                             Content="{markups:Translate Playback_EventScope_All}"
                             Command="{Binding ShowAllEventsCommand}" />
@@ -23,7 +23,7 @@
                     <Path Classes="PlaybackBreadcrumbSeparator"
                           Data="{StaticResource chevron-right}"
                           IsVisible="{Binding HasEventScopeCombatant}" />
-                    <Button Classes="PlaybackBreadcrumbButton"
+                    <Button Classes="AppButton PlaybackBreadcrumbButton"
                             Content="{Binding EventScopeCombatantText}"
                             Command="{Binding ShowCombatantEventsCommand}"
                             IsVisible="{Binding HasEventScopeCombatant}" />
@@ -31,7 +31,7 @@
                     <Path Classes="PlaybackBreadcrumbSeparator"
                           Data="{StaticResource chevron-right}"
                           IsVisible="{Binding HasEventScopeRelation}" />
-                    <Button Classes="PlaybackBreadcrumbButton"
+                    <Button Classes="AppButton PlaybackBreadcrumbButton"
                             Content="{Binding EventScopeRelationText}"
                             Command="{Binding ShowRelationEventsCommand}"
                             IsVisible="{Binding HasEventScopeRelation}" />
@@ -39,7 +39,7 @@
                     <Path Classes="PlaybackBreadcrumbSeparator"
                           Data="{StaticResource chevron-right}"
                           IsVisible="{Binding HasEventScopeCategory}" />
-                    <Button Classes="PlaybackBreadcrumbButton"
+                    <Button Classes="AppButton PlaybackBreadcrumbButton"
                             Content="{Binding EventScopeCategoryText}"
                             Command="{Binding ShowCategoryEventsCommand}"
                             IsVisible="{Binding HasEventScopeCategory}" />

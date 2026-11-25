@@ -4,10 +4,6 @@
              xmlns:vm="clr-namespace:Cloris.Aion2Flow.ViewModels"
              x:Class="Cloris.Aion2Flow.Views.CombatDirectionDetailView"
              x:DataType="vm:CombatDirectionDetailViewModel">
-    <UserControl.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/OverlayTheme.axaml" />
-    </UserControl.Styles>
-
     <StackPanel Orientation="Vertical"
                 Spacing="14">
         <views:DamageDetailView x:Name="DamageDetail"

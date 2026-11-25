@@ -79,7 +79,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     public LocalizationService Localization { get; }
     public CombatantDetailsFlyoutViewModel CombatantDetails => _combatantDetails;
-    public SettingsFlyoutViewModel SettingsFlyout { get; }
+    public SettingsViewModel Settings { get; }
     public CombatantColumnLayoutViewModel CombatantColumns { get; }
     public ObservableCollection<BossFocusViewModel> BossFocuses { get; } = [];
     public KeyedObservableCollection<int, CombatantRowViewModel> Combatants { get; } = new(x => x.Id);
@@ -192,7 +192,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         EncounterArchiveService encounterArchiveService,
         CombatantDetailsFlyoutViewModel combatantDetails,
         LocalizationService localization,
-        SettingsFlyoutViewModel settingsFlyout,
+        SettingsViewModel settings,
         UiFrameBatchService frameBatchService)
         : base(frameBatchService)
     {
@@ -204,11 +204,11 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _combatantDetails = combatantDetails;
         _frameBatchService = frameBatchService;
         Localization = localization;
-        SettingsFlyout = settingsFlyout;
-        _combatantDetails.EncounterTimeDisplayFormat = SettingsFlyout.EncounterTimeDisplayFormat;
-        if (_captureService.Scene.Kind != SettingsFlyout.SceneKind)
-            _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
-        _captureService.Scene.SetCombatantStatisticsScope(SettingsFlyout.CombatantStatisticsScope);
+        Settings = settings;
+        _combatantDetails.EncounterTimeDisplayFormat = Settings.EncounterTimeDisplayFormat;
+        if (_captureService.Scene.Kind != Settings.SceneKind)
+            _captureService.Scene.ChangeKind(Settings.SceneKind, _captureService.Scene.SessionStarted, archiveCurrent: false);
+        _captureService.Scene.SetCombatantStatisticsScope(Settings.CombatantStatisticsScope);
         CombatantColumns = new CombatantColumnLayoutViewModel(frameBatchService);
         ApplyCombatantMetricDisplaySettings();
         CombatantColumns.SetBossShareColumnVisibility(false);
@@ -225,7 +225,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _languageService.LanguageChanged += OnLanguageChanged;
         _gameResourceService.ResourcesChanged += OnResourcesChanged;
         _encounterArchiveService.HistoryChanged += OnEncounterHistoryChanged;
-        SettingsFlyout.PropertyChanged += OnSettingsFlyoutPropertyChanged;
+        Settings.PropertyChanged += OnSettingsPropertyChanged;
 
         RebuildEncounterHistory();
         ApplyLocalizedUiText();
@@ -282,28 +282,28 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         Dispatcher.UIThread.Post(RebuildEncounterHistory);
     }
 
-    private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.SelectedClientVersion))
+        if (e.PropertyName == nameof(SettingsViewModel.SelectedClientVersion))
             _ = ChangeClientAsync();
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantSortMetric))
+        else if (e.PropertyName == nameof(SettingsViewModel.CombatantSortMetric))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.SceneKind))
+        else if (e.PropertyName == nameof(SettingsViewModel.SceneKind))
             Dispatcher.UIThread.Post(ChangeSceneKind);
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.UseCompactMainMetrics) ||
-                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowDamagePerSecondColumn) ||
-                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowDamageColumn) ||
-                 e.PropertyName == nameof(SettingsFlyoutViewModel.ShowTotalDamagePerSecond))
+        else if (e.PropertyName == nameof(SettingsViewModel.UseCompactMainMetrics) ||
+                 e.PropertyName == nameof(SettingsViewModel.ShowDamagePerSecondColumn) ||
+                 e.PropertyName == nameof(SettingsViewModel.ShowDamageColumn) ||
+                 e.PropertyName == nameof(SettingsViewModel.ShowTotalDamagePerSecond))
             ApplyCombatantMetricDisplaySettings();
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat))
-            _combatantDetails.EncounterTimeDisplayFormat = SettingsFlyout.EncounterTimeDisplayFormat;
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.CombatantStatisticsScope))
+        else if (e.PropertyName == nameof(SettingsViewModel.EncounterTimeDisplayFormat))
+            _combatantDetails.EncounterTimeDisplayFormat = Settings.EncounterTimeDisplayFormat;
+        else if (e.PropertyName == nameof(SettingsViewModel.CombatantStatisticsScope))
         {
             ClearBossFocusProjection();
-            _captureService.Scene.SetCombatantStatisticsScope(SettingsFlyout.CombatantStatisticsScope);
+            _captureService.Scene.SetCombatantStatisticsScope(Settings.CombatantStatisticsScope);
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
         }
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.ShowFocusStatusBar))
+        else if (e.PropertyName == nameof(SettingsViewModel.ShowFocusStatusBar))
             Dispatcher.UIThread.Post(() => RefreshDisplayedSnapshot());
     }
 
@@ -579,10 +579,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                     _archivedBossFocusSnapshots,
                     _archivedBossDamageContributions,
                     DisplayContext,
-                    SettingsFlyout.CombatantStatisticsScope,
+                    Settings.CombatantStatisticsScope,
                     Combatants.ContainsKey,
                     _bossFocusDisplayGroups);
-                if (SettingsFlyout.ShowFocusStatusBar)
+                if (Settings.ShowFocusStatusBar)
                     SyncBossFocuses();
                 RefreshCombatantBossShares(_bossFocusDisplayGroups, _archivedBossDamageContributions);
             }
@@ -600,7 +600,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             snapshots,
             damageContributions,
             DisplayContext,
-            SettingsFlyout.CombatantStatisticsScope,
+            Settings.CombatantStatisticsScope,
             Combatants.ContainsKey,
             _bossFocusDisplayCandidates);
 
@@ -618,7 +618,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
                 _frozenBossFocusSnapshots,
                 _frozenBossDamageContributions,
                 DisplayContext,
-                SettingsFlyout.CombatantStatisticsScope,
+                Settings.CombatantStatisticsScope,
                 Combatants.ContainsKey,
                 _bossFocusDisplayCandidates);
             damageContributions = _frozenBossDamageContributions;
@@ -626,7 +626,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
         _bossFocusDisplayGroups.Clear();
         _bossFocusDisplayGroups.AddRange(_bossFocusDisplayCandidates);
-        if (SettingsFlyout.ShowFocusStatusBar)
+        if (Settings.ShowFocusStatusBar)
         {
             SyncBossFocuses();
         }
@@ -822,10 +822,10 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     private void ApplyCombatantMetricDisplaySettings()
     {
         CombatantColumns.ApplyMetricDisplaySettings(
-            SettingsFlyout.ShowDamagePerSecondColumn,
-            SettingsFlyout.ShowDamageColumn,
-            SettingsFlyout.ShowTotalDamagePerSecond,
-            SettingsFlyout.UseCompactMainMetrics);
+            Settings.ShowDamagePerSecondColumn,
+            Settings.ShowDamageColumn,
+            Settings.ShowTotalDamagePerSecond,
+            Settings.UseCompactMainMetrics);
     }
 
     private void RefreshCombatantBars(Guid encounterId)
@@ -853,7 +853,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
     }
 
     private double ResolveCombatantSortMetric(CombatantRowViewModel row) =>
-        SettingsFlyout.CombatantSortMetric == CombatantSortMetric.TotalDamage
+        Settings.CombatantSortMetric == CombatantSortMetric.TotalDamage
             ? row.Damage
             : row.DamagePerSecond;
 
@@ -955,7 +955,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             return false;
         }
 
-        var scope = SettingsFlyout.CombatantStatisticsScope;
+        var scope = Settings.CombatantStatisticsScope;
         if (scope == CombatantStatisticsScope.All)
         {
             return data.CharacterClass is not null;
@@ -994,7 +994,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _languageService.LanguageChanged -= OnLanguageChanged;
         _gameResourceService.ResourcesChanged -= OnResourcesChanged;
         _encounterArchiveService.HistoryChanged -= OnEncounterHistoryChanged;
-        SettingsFlyout.PropertyChanged -= OnSettingsFlyoutPropertyChanged;
+        Settings.PropertyChanged -= OnSettingsPropertyChanged;
         _combatantDetails.Dispose();
         await StopCaptureAsync().ConfigureAwait(false);
         await _processPortDiscoveryService.DisposeAsync().ConfigureAwait(false);
@@ -1092,9 +1092,9 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
         _suppressRefresh = true;
         try
         {
-            while (!_isDisposed && _captureService.Scene.ClientContext.Profile.Version != SettingsFlyout.SelectedClientVersion)
+            while (!_isDisposed && _captureService.Scene.ClientContext.Profile.Version != Settings.SelectedClientVersion)
             {
-                var context = SceneClientContext.Create(ClientProfiles.Get(SettingsFlyout.SelectedClientVersion));
+                var context = SceneClientContext.Create(ClientProfiles.Get(Settings.SelectedClientVersion));
                 await _captureService.SwitchClientAsync(context, ArchiveForClientChange);
                 IsCapturing = _captureService.IsDriverActive;
                 if (_isDisposed)
@@ -1108,7 +1108,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             IsCapturing = _captureService.IsDriverActive;
             if (!_isDisposed)
             {
-                SettingsFlyout.SelectedClientVersion = _captureService.Scene.ClientContext.Profile.Version;
+                Settings.SelectedClientVersion = _captureService.Scene.ClientContext.Profile.Version;
                 _displayContextVersion++;
                 ResetLivePresentation();
                 Status = ex.Message;
@@ -1121,7 +1121,7 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
             if (!_isDisposed)
             {
                 ChangeSceneKind();
-                _captureService.Scene.SetCombatantStatisticsScope(SettingsFlyout.CombatantStatisticsScope);
+                _captureService.Scene.SetCombatantStatisticsScope(Settings.CombatantStatisticsScope);
                 RebuildEncounterHistory();
                 RefreshDisplayedSnapshot(forceDetailRefresh: true);
                 RefreshCaptureIndicators();
@@ -1139,14 +1139,14 @@ public sealed partial class MainViewModel : FrameBatchedObservableObject, IAsync
 
     private void ChangeSceneKind()
     {
-        if (_isDisposed || _suppressRefresh || _captureService.Scene.Kind == SettingsFlyout.SceneKind)
+        if (_isDisposed || _suppressRefresh || _captureService.Scene.Kind == Settings.SceneKind)
             return;
 
         _suppressRefresh = true;
         try
         {
             DrainPendingBossArchives();
-            var archive = _captureService.Scene.ChangeKind(SettingsFlyout.SceneKind, RawPacketDump.RotateLogs, archiveCurrent: true);
+            var archive = _captureService.Scene.ChangeKind(Settings.SceneKind, RawPacketDump.RotateLogs, archiveCurrent: true);
             if (archive is { } payload)
                 _encounterArchiveService.Archive(payload, "scene-kind-change", isAutomatic: true);
             ResetLivePresentation();

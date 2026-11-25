@@ -1,12 +1,8 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
-using Avalonia.Themes.Simple;
-using Cloris.Aion2Flow.Assets.Icons;
 using Cloris.Aion2Flow.Capture;
 using Cloris.Aion2Flow.Capture.Diagnostics;
 using Cloris.Aion2Flow.Controls;
-using Cloris.Aion2Flow.Presentation;
 using Cloris.Aion2Flow.SceneRuntime.Archive;
 using Cloris.Aion2Flow.SceneRuntime.Playback;
 using Cloris.Aion2Flow.Services;
@@ -14,6 +10,7 @@ using Cloris.Aion2Flow.Services.Hotkeys;
 using Cloris.Aion2Flow.Services.Logging;
 using Cloris.Aion2Flow.Services.Overlay;
 using Cloris.Aion2Flow.Services.Settings;
+using Cloris.Aion2Flow.Styles;
 using Cloris.Aion2Flow.ViewModels;
 using Cloris.Aion2Flow.Views;
 using Cloris.Aion2Flow.WinDivert;
@@ -113,7 +110,7 @@ internal static class Program
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<OverlayInteractionController>();
         services.AddSingleton<SkillMonitorWindowController>();
-        services.AddSingleton<SettingsFlyoutViewModel>();
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainAppWindow>();
 
@@ -182,9 +179,7 @@ file sealed class App(IServiceProvider serviceProvider) : Application
     {
         SmoothScrollBehavior.Initialize();
         RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
-        Styles.Add(new SimpleTheme());
-        Styles.Add(AppTextRenderingPolicy.CreateTopLevelStyle());
-        Resources.MergedDictionaries.Add(new IconGeometries());
+        Styles.Add(new AppTheme());
     }
 
     public override void OnFrameworkInitializationCompleted()

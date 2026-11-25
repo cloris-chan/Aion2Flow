@@ -21,6 +21,11 @@
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>設定</value></data>
+  <data name="Settings_Category_Display" xml:space="preserve"><value>浮窗與顯示</value></data>
+  <data name="Settings_Category_Combat" xml:space="preserve"><value>戰鬥統計</value></data>
+  <data name="Settings_Category_Hotkeys" xml:space="preserve"><value>快捷鍵</value></data>
+  <data name="Settings_Category_ClientLanguage" xml:space="preserve"><value>客戶端與語言</value></data>
+  <data name="Settings_Category_Updates" xml:space="preserve"><value>版本與更新</value></data>
   <data name="Settings_Topmost" xml:space="preserve"><value>置頂模式</value></data>
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>僅遊戲前台時</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>始終</value></data>
@@ -32,42 +37,23 @@
   <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>秒傷列</value></data>
   <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>總傷列</value></data>
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>底部總秒傷</value></data>
-  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>顯示</value></data>
-  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>隱藏</value></data>
   <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>時間格式</value></data>
   <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
   <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>主數值緊湊顯示</value></data>
-  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>開啟</value></data>
-  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>目標狀態條</value></data>
-  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>開啟</value></data>
-  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>關閉</value></data>
-  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>點擊穿透時標題列</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>隱藏</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>顯示</value></data>
-  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>名稱顯示</value></data>
-  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>顯示</value></data>
-  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>隱藏</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>點擊穿透時隱藏標題列</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>顯示玩家名稱</value></data>
   <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>玩家名稱</value></data>
   <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>自己標記</value></data>
   <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>不顯示</value></data>
   <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>隱藏名稱時顯示</value></data>
   <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>始終顯示</value></data>
   <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>伺服器名稱</value></data>
-  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>顯示</value></data>
-  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>隱藏</value></data>
   <data name="Settings_PlayerLegionName" xml:space="preserve"><value>軍團名稱</value></data>
-  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>顯示</value></data>
-  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>隱藏</value></data>
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>陣營著色</value></data>
-  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>開啟</value></data>
-  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_SkillMonitor" xml:space="preserve"><value>技能監控</value></data>
   <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>啟用</value></data>
-  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>技能監控設定</value></data>
-  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>開啟</value></data>
-  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>全選</value></data>
   <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>全部取消</value></data>
   <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>增益持續時間</value></data>

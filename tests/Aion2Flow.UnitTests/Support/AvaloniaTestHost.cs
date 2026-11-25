@@ -2,8 +2,9 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Avalonia;
-using Avalonia.Themes.Simple;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using Cloris.Aion2Flow.Styles;
 
 namespace Cloris.Aion2Flow.Tests.Support;
 
@@ -66,8 +67,6 @@ internal static class AvaloniaTestHost
                 .UsePlatformDetect()
                 .SetupWithoutStarting();
 
-            if (Application.Current is { } application && !application.Styles.OfType<SimpleTheme>().Any())
-                application.Styles.Add(new SimpleTheme());
         }
         catch (Exception ex)
         {
@@ -94,7 +93,8 @@ internal static class AvaloniaTestHost
     {
         public override void Initialize()
         {
-            Styles.Add(new SimpleTheme());
+            RequestedThemeVariant = ThemeVariant.Dark;
+            Styles.Add(new AppTheme());
         }
     }
 

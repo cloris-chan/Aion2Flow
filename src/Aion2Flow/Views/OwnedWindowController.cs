@@ -2,7 +2,7 @@ using Avalonia.Controls;
 
 namespace Cloris.Aion2Flow.Views;
 
-internal sealed class PlaybackWindowController
+internal sealed class OwnedWindowController
 {
     private Window? _window;
 
@@ -30,7 +30,7 @@ internal sealed class PlaybackWindowController
         ArgumentNullException.ThrowIfNull(window);
         ArgumentNullException.ThrowIfNull(owner);
         if (_window is not null)
-            throw new InvalidOperationException("A playback window is already open.");
+            throw new InvalidOperationException("A window is already open.");
 
         _window = window;
         window.Closed += WindowClosed;

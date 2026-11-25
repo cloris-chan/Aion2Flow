@@ -21,6 +21,11 @@
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>Configurações</value></data>
+  <data name="Settings_Category_Display" xml:space="preserve"><value>Sobreposição e exibição</value></data>
+  <data name="Settings_Category_Combat" xml:space="preserve"><value>Estatísticas de combate</value></data>
+  <data name="Settings_Category_Hotkeys" xml:space="preserve"><value>Atalhos de teclado</value></data>
+  <data name="Settings_Category_ClientLanguage" xml:space="preserve"><value>Cliente e idioma</value></data>
+  <data name="Settings_Category_Updates" xml:space="preserve"><value>Versão e atualizações</value></data>
   <data name="Settings_Topmost" xml:space="preserve"><value>Modo de exibição no topo</value></data>
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>Com o jogo em foco</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>Sempre</value></data>
@@ -32,42 +37,23 @@
   <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>Coluna de DPS</value></data>
   <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>Coluna de dano total</value></data>
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>DPS total no rodapé</value></data>
-  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>Ocultar</value></data>
   <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>Formato de tempo</value></data>
   <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
   <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>Abreviar números</value></data>
-  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>Ativado</value></data>
-  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>Desativado</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>Barra de estado do alvo</value></data>
-  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>Ativada</value></data>
-  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>Desativada</value></data>
-  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Barra de título com passagem de cliques</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>Ocultar</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Visibilidade dos nomes</value></data>
-  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>Ocultar</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>Ocultar a barra de título no modo de passagem de cliques</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>Mostrar nomes dos jogadores</value></data>
   <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>Nomes dos jogadores</value></data>
   <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>Marcador do próprio jogador</value></data>
   <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>Desativado</value></data>
   <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>Quando os nomes estiverem ocultos</value></data>
   <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>Sempre</value></data>
   <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>Nome do servidor</value></data>
-  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>Ocultar</value></data>
   <data name="Settings_PlayerLegionName" xml:space="preserve"><value>Nome da Legião</value></data>
-  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>Mostrar</value></data>
-  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>Ocultar</value></data>
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>Cor por raça</value></data>
-  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>Ativada</value></data>
-  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>Desativada</value></data>
   <data name="Settings_SkillMonitor" xml:space="preserve"><value>Monitor de habilidades</value></data>
   <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>Ativar</value></data>
-  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>Configurar monitor de habilidades</value></data>
-  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>Ativado</value></data>
-  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>Desativado</value></data>
   <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>Selecionar tudo</value></data>
   <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>Limpar seleção</value></data>
   <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>Duração dos reforços</value></data>

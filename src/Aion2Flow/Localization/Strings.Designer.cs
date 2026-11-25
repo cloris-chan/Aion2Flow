@@ -1599,13 +1599,112 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Click-through title bar.
+        ///   Looks up a localized string similar to Client and language.
+        /// </summary>
+        internal static string Settings_Category_ClientLanguage
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_Category_ClientLanguage", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Combat statistics.
+        /// </summary>
+        internal static string Settings_Category_Combat
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_Category_Combat", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Overlay and display.
+        /// </summary>
+        internal static string Settings_Category_Display
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_Category_Display", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Shortcuts.
+        /// </summary>
+        internal static string Settings_Category_Hotkeys
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_Category_Hotkeys", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Version and updates.
+        /// </summary>
+        internal static string Settings_Category_Updates
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_Category_Updates", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Hide the title bar in click-through mode.
         /// </summary>
         internal static string Settings_ClickThroughTitleBar
         {
             get
             {
                 return ResourceManager.GetString("Settings_ClickThroughTitleBar", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Game client.
+        /// </summary>
+        internal static string Settings_ClientVersion
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_ClientVersion", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Switching automatically archives the current scene and applies the selected game client..
+        /// </summary>
+        internal static string Settings_ClientVersion_ChangeHint
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_ClientVersion_ChangeHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to PURPLE (KR/TW).
+        /// </summary>
+        internal static string Settings_ClientVersion_Purple
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_ClientVersion_Purple", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Steam.
+        /// </summary>
+        internal static string Settings_ClientVersion_Steam
+        {
+            get
+            {
+                return ResourceManager.GetString("Settings_ClientVersion_Steam", resourceCulture);
             }
         }
 
@@ -1720,50 +1819,6 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Off.
-        /// </summary>
-        internal static string Settings_FocusStatusBar_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_FocusStatusBar_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to On.
-        /// </summary>
-        internal static string Settings_FocusStatusBar_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_FocusStatusBar_On", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Show.
-        /// </summary>
-        internal static string Settings_HideHeaderWhenClickThrough_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_HideHeaderWhenClickThrough_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Hide.
-        /// </summary>
-        internal static string Settings_HideHeaderWhenClickThrough_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_HideHeaderWhenClickThrough_On", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Looks up a localized string similar to Battle reset hotkey.
         /// </summary>
         internal static string Settings_Hotkey_BattleReset
@@ -1819,7 +1874,7 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Language.
+        ///   Looks up a localized string similar to Interface language.
         /// </summary>
         internal static string Settings_Language
         {
@@ -1837,28 +1892,6 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Settings_MainMetricsCompact", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Off.
-        /// </summary>
-        internal static string Settings_MainMetricsCompact_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_MainMetricsCompact_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to On.
-        /// </summary>
-        internal static string Settings_MainMetricsCompact_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_MainMetricsCompact_On", resourceCulture);
             }
         }
 
@@ -1896,28 +1929,6 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Hide.
-        /// </summary>
-        internal static string Settings_MainMetricVisibility_Hide
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_MainMetricVisibility_Hide", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Show.
-        /// </summary>
-        internal static string Settings_MainMetricVisibility_Show
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_MainMetricVisibility_Show", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Looks up a localized string similar to Bottom total DPS.
         /// </summary>
         internal static string Settings_MainMetricVisibility_TotalDamagePerSecond
@@ -1940,57 +1951,13 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Off.
-        /// </summary>
-        internal static string Settings_PlayerFactionTint_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_PlayerFactionTint_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to On.
-        /// </summary>
-        internal static string Settings_PlayerFactionTint_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_PlayerFactionTint_On", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Legion name.
+        ///   Looks up a localized string similar to Legion Name.
         /// </summary>
         internal static string Settings_PlayerLegionName
         {
             get
             {
                 return ResourceManager.GetString("Settings_PlayerLegionName", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Hide.
-        /// </summary>
-        internal static string Settings_PlayerLegionName_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_PlayerLegionName_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Show.
-        /// </summary>
-        internal static string Settings_PlayerLegionName_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_PlayerLegionName_On", resourceCulture);
             }
         }
 
@@ -2061,24 +2028,13 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Hide.
+        ///   Looks up a localized string similar to Game resource language.
         /// </summary>
-        internal static string Settings_PlayerShortServerName_Off
+        internal static string Settings_ResourceLanguage
         {
             get
             {
-                return ResourceManager.GetString("Settings_PlayerShortServerName_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Show.
-        /// </summary>
-        internal static string Settings_PlayerShortServerName_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_PlayerShortServerName_On", resourceCulture);
+                return ResourceManager.GetString("Settings_ResourceLanguage", resourceCulture);
             }
         }
 
@@ -2116,35 +2072,13 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Name visibility.
+        ///   Looks up a localized string similar to Show player names.
         /// </summary>
         internal static string Settings_ShowPlayerNames
         {
             get
             {
                 return ResourceManager.GetString("Settings_ShowPlayerNames", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Hide.
-        /// </summary>
-        internal static string Settings_ShowPlayerNames_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_ShowPlayerNames_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Show.
-        /// </summary>
-        internal static string Settings_ShowPlayerNames_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_ShowPlayerNames_On", resourceCulture);
             }
         }
 
@@ -2204,17 +2138,6 @@ namespace Cloris.Aion2Flow.Localization
         }
 
         /// <summary>
-        ///   Looks up a localized string similar to Skill monitor settings.
-        /// </summary>
-        internal static string Settings_SkillMonitor_Configure
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_SkillMonitor_Configure", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Looks up a localized string similar to Cooldown.
         /// </summary>
         internal static string Settings_SkillMonitor_CooldownColumn
@@ -2255,28 +2178,6 @@ namespace Cloris.Aion2Flow.Localization
             get
             {
                 return ResourceManager.GetString("Settings_SkillMonitor_Enable", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Off.
-        /// </summary>
-        internal static string Settings_SkillMonitor_Off
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_SkillMonitor_Off", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to On.
-        /// </summary>
-        internal static string Settings_SkillMonitor_On
-        {
-            get
-            {
-                return ResourceManager.GetString("Settings_SkillMonitor_On", resourceCulture);
             }
         }
 

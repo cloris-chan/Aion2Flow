@@ -15,7 +15,7 @@ internal sealed class SkillMonitorWindowController
     private readonly LocalizationService _localization;
     private readonly SettingsService _settingsService;
     private readonly UiScaleService _uiScale;
-    private readonly SettingsFlyoutViewModel _settings;
+    private readonly SettingsViewModel _settings;
     private readonly ProcessForegroundWatcher _foregroundWatcher;
     private SkillMonitorWindow? _window;
     private Window? _owner;
@@ -26,7 +26,7 @@ internal sealed class SkillMonitorWindowController
         LocalizationService localization,
         SettingsService settingsService,
         UiScaleService uiScale,
-        SettingsFlyoutViewModel settings,
+        SettingsViewModel settings,
         ProcessForegroundWatcher foregroundWatcher)
     {
         _captureService = captureService;
@@ -123,18 +123,18 @@ internal sealed class SkillMonitorWindowController
 
     private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.SkillMonitorEnabled))
+        if (e.PropertyName == nameof(SettingsViewModel.SkillMonitorEnabled))
         {
             if (_settings.SkillMonitorEnabled && _owner is { } owner)
                 ShowOrActivate(owner);
             else
                 CloseWindow(clearOwner: false);
         }
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.IsAlwaysOnTop) && _window is { } window)
+        else if (e.PropertyName == nameof(SettingsViewModel.IsAlwaysOnTop) && _window is { } window)
         {
             SynchronizeWindowState(window);
         }
-        else if (e.PropertyName == nameof(SettingsFlyoutViewModel.EncounterTimeDisplayFormat) && _window is { } formatWindow)
+        else if (e.PropertyName == nameof(SettingsViewModel.EncounterTimeDisplayFormat) && _window is { } formatWindow)
         {
             formatWindow.DataContext.EncounterTimeDisplayFormat = _settings.EncounterTimeDisplayFormat;
         }

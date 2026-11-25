@@ -3,7 +3,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
-using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -948,11 +947,6 @@ public sealed class AnimatedItemsViewTests
     {
         AvaloniaTestHost.Run(() =>
         {
-            var style = new StyleInclude(new Uri("avares://Aion2Flow/"))
-            {
-                Source = new Uri("avares://Aion2Flow/Styles/OverlayTheme.axaml")
-            };
-            Application.Current!.Styles.Add(style);
             var emptyTemplate = new FuncDataTemplate<object>(static (_, _) => new Border { Height = 32 });
             var view = CreateView(CreateCollection(0), maxVisibleItems: 5);
             view.EmptyTemplate = emptyTemplate;
@@ -975,7 +969,6 @@ public sealed class AnimatedItemsViewTests
             finally
             {
                 Close(window);
-                Application.Current.Styles.Remove(style);
             }
         });
     }

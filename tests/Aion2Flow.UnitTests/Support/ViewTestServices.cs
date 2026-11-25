@@ -22,6 +22,7 @@ internal static class ViewTestServices
                 s_frameBatch = new UiFrameBatchService();
                 s_localization = new LocalizationService(language);
                 Ioc.Default.ConfigureServices(new ServiceCollection()
+                    .AddSingleton(language)
                     .AddSingleton(s_localization)
                     .BuildServiceProvider());
             }

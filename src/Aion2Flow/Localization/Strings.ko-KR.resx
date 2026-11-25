@@ -21,6 +21,11 @@
 
   <!-- Settings -->
   <data name="Settings_Title" xml:space="preserve"><value>설정</value></data>
+  <data name="Settings_Category_Display" xml:space="preserve"><value>오버레이 및 표시</value></data>
+  <data name="Settings_Category_Combat" xml:space="preserve"><value>전투 통계</value></data>
+  <data name="Settings_Category_Hotkeys" xml:space="preserve"><value>단축키</value></data>
+  <data name="Settings_Category_ClientLanguage" xml:space="preserve"><value>클라이언트 및 언어</value></data>
+  <data name="Settings_Category_Updates" xml:space="preserve"><value>버전 및 업데이트</value></data>
   <data name="Settings_Topmost" xml:space="preserve"><value>항상 위 모드</value></data>
   <data name="Settings_Topmost_GameForeground" xml:space="preserve"><value>게임 활성 시</value></data>
   <data name="Settings_Topmost_Always" xml:space="preserve"><value>항상</value></data>
@@ -32,42 +37,23 @@
   <data name="Settings_MainMetricVisibility_DamagePerSecond" xml:space="preserve"><value>DPS 열</value></data>
   <data name="Settings_MainMetricVisibility_Damage" xml:space="preserve"><value>총 피해 열</value></data>
   <data name="Settings_MainMetricVisibility_TotalDamagePerSecond" xml:space="preserve"><value>하단 총 DPS</value></data>
-  <data name="Settings_MainMetricVisibility_Show" xml:space="preserve"><value>표시</value></data>
-  <data name="Settings_MainMetricVisibility_Hide" xml:space="preserve"><value>숨김</value></data>
   <data name="Settings_TimeDisplayFormat" xml:space="preserve"><value>시간 형식</value></data>
   <data name="Settings_TimeDisplayFormat_DecimalSeconds" xml:space="preserve"><value>68.3s</value></data>
   <data name="Settings_TimeDisplayFormat_MinutesSeconds" xml:space="preserve"><value>01:08</value></data>
   <data name="Settings_MainMetricsCompact" xml:space="preserve"><value>주요 수치 축약 표시</value></data>
-  <data name="Settings_MainMetricsCompact_On" xml:space="preserve"><value>켬</value></data>
-  <data name="Settings_MainMetricsCompact_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_FocusStatusBar" xml:space="preserve"><value>대상 상태 바</value></data>
-  <data name="Settings_FocusStatusBar_On" xml:space="preserve"><value>켬</value></data>
-  <data name="Settings_FocusStatusBar_Off" xml:space="preserve"><value>끔</value></data>
-  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>클릭 통과 시 제목 표시줄</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_On" xml:space="preserve"><value>숨김</value></data>
-  <data name="Settings_HideHeaderWhenClickThrough_Off" xml:space="preserve"><value>표시</value></data>
-  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>이름 표시</value></data>
-  <data name="Settings_ShowPlayerNames_On" xml:space="preserve"><value>표시</value></data>
-  <data name="Settings_ShowPlayerNames_Off" xml:space="preserve"><value>숨김</value></data>
+  <data name="Settings_ClickThroughTitleBar" xml:space="preserve"><value>클릭 통과 시 제목 표시줄 숨기기</value></data>
+  <data name="Settings_ShowPlayerNames" xml:space="preserve"><value>플레이어 이름 표시</value></data>
   <data name="Settings_PlayerNameSettings" xml:space="preserve"><value>플레이어 이름</value></data>
   <data name="Settings_PlayerSelfMarker" xml:space="preserve"><value>내 표시</value></data>
   <data name="Settings_PlayerSelfMarker_Hidden" xml:space="preserve"><value>표시 안 함</value></data>
   <data name="Settings_PlayerSelfMarker_WhenNamesHidden" xml:space="preserve"><value>이름 숨김 시 표시</value></data>
   <data name="Settings_PlayerSelfMarker_Always" xml:space="preserve"><value>항상 표시</value></data>
   <data name="Settings_PlayerShortServerName" xml:space="preserve"><value>서버 이름</value></data>
-  <data name="Settings_PlayerShortServerName_On" xml:space="preserve"><value>표시</value></data>
-  <data name="Settings_PlayerShortServerName_Off" xml:space="preserve"><value>숨김</value></data>
   <data name="Settings_PlayerLegionName" xml:space="preserve"><value>레기온명</value></data>
-  <data name="Settings_PlayerLegionName_On" xml:space="preserve"><value>표시</value></data>
-  <data name="Settings_PlayerLegionName_Off" xml:space="preserve"><value>숨김</value></data>
   <data name="Settings_PlayerFactionTint" xml:space="preserve"><value>종족 색상 표시</value></data>
-  <data name="Settings_PlayerFactionTint_On" xml:space="preserve"><value>켬</value></data>
-  <data name="Settings_PlayerFactionTint_Off" xml:space="preserve"><value>끔</value></data>
   <data name="Settings_SkillMonitor" xml:space="preserve"><value>스킬 모니터</value></data>
   <data name="Settings_SkillMonitor_Enable" xml:space="preserve"><value>사용</value></data>
-  <data name="Settings_SkillMonitor_Configure" xml:space="preserve"><value>스킬 모니터 설정</value></data>
-  <data name="Settings_SkillMonitor_On" xml:space="preserve"><value>켜짐</value></data>
-  <data name="Settings_SkillMonitor_Off" xml:space="preserve"><value>꺼짐</value></data>
   <data name="Settings_SkillMonitor_SelectAll" xml:space="preserve"><value>전체 선택</value></data>
   <data name="Settings_SkillMonitor_ClearAll" xml:space="preserve"><value>전체 해제</value></data>
   <data name="Settings_SkillMonitor_BuffDisplay" xml:space="preserve"><value>버프 지속시간</value></data>

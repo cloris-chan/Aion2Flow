@@ -8,7 +8,7 @@
         xmlns:views="clr-namespace:Cloris.Aion2Flow.Views"
         x:Class="Cloris.Aion2Flow.Views.ScenePlaybackWindow"
         x:DataType="vm:ScenePlaybackViewModel"
-        Classes="PlaybackWindow"
+        Classes="AppWindow"
         Width="1600"
         Height="900"
         MinWidth="1320"
@@ -66,10 +66,6 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Window.Styles>
-        <StyleInclude Source="avares://Aion2Flow/Styles/PlaybackTheme.axaml" />
-    </Window.Styles>
-
     <Grid x:Name="RootLayout"
           RowDefinitions="Auto,Auto,*"
           MinWidth="0"
@@ -88,39 +84,39 @@
                             Orientation="Horizontal"
                             Spacing="2"
                             VerticalAlignment="Center">
-                    <Button Classes="PlaybackIconButton PlaybackPrimaryButton"
+                    <Button Classes="AppIconButton PlaybackIconButton PlaybackPrimaryButton"
                             Command="{Binding TogglePlayPauseCommand}"
                             IsVisible="{Binding IsPlaying, Converter={StaticResource InverseBooleanConverter}}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource play}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource play}" />
                     </Button>
-                    <Button Classes="PlaybackIconButton PlaybackPrimaryButton"
+                    <Button Classes="AppIconButton PlaybackIconButton PlaybackPrimaryButton"
                             Command="{Binding TogglePlayPauseCommand}"
                             IsVisible="{Binding IsPlaying}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource pause}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource pause}" />
                     </Button>
-                    <Button Classes="PlaybackIconButton" Command="{Binding StopCommand}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource square}" />
+                    <Button Classes="AppIconButton PlaybackIconButton" Command="{Binding StopCommand}">
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource square}" />
                     </Button>
                     <Border Classes="PlaybackToolbarDivider" />
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding StepEventBackwardCommand}"
                             ToolTip.Tip="{markups:Translate Playback_PreviousEvent}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource chevron-left}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource chevron-left}" />
                     </Button>
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding StepBackwardCommand}"
                             ToolTip.Tip="{markups:Translate Playback_PreviousSecond}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource skip-back}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource skip-back}" />
                     </Button>
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding StepForwardCommand}"
                             ToolTip.Tip="{markups:Translate Playback_NextSecond}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource skip-forward}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource skip-forward}" />
                     </Button>
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding StepEventForwardCommand}"
                             ToolTip.Tip="{markups:Translate Playback_NextEvent}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource chevron-right}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource chevron-right}" />
                     </Button>
                 </StackPanel>
 
@@ -130,22 +126,22 @@
                             VerticalAlignment="Center">
                     <TextBlock Classes="PlaybackMetricLabel"
                                Text="{markups:Translate Playback_Label_Speed}" />
-                    <Button Classes="PlaybackSpeedButton"
+                    <Button Classes="AppButton PlaybackSpeedButton"
                             Classes.PlaybackSelected="{Binding IsHalfSpeed}"
                             Content="0.5x"
                             Command="{Binding SetSpeedCommand}"
                             CommandParameter="0.5" />
-                    <Button Classes="PlaybackSpeedButton"
+                    <Button Classes="AppButton PlaybackSpeedButton"
                             Classes.PlaybackSelected="{Binding IsNormalSpeed}"
                             Content="1x"
                             Command="{Binding SetSpeedCommand}"
                             CommandParameter="1" />
-                    <Button Classes="PlaybackSpeedButton"
+                    <Button Classes="AppButton PlaybackSpeedButton"
                             Classes.PlaybackSelected="{Binding IsDoubleSpeed}"
                             Content="2x"
                             Command="{Binding SetSpeedCommand}"
                             CommandParameter="2" />
-                    <Button Classes="PlaybackSpeedButton"
+                    <Button Classes="AppButton PlaybackSpeedButton"
                             Classes.PlaybackSelected="{Binding IsQuadrupleSpeed}"
                             Content="4x"
                             Command="{Binding SetSpeedCommand}"
@@ -153,19 +149,19 @@
                     <Border Classes="PlaybackToolbarDivider" />
                     <TextBlock Classes="PlaybackMetricLabel"
                                Text="{markups:Translate Playback_Label_Zoom}" />
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding ZoomTimelineOutCommand}"
                             ToolTip.Tip="{markups:Translate Playback_ZoomOut}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource minus}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource minus}" />
                     </Button>
-                    <Button Classes="PlaybackSpeedButton"
+                    <Button Classes="AppButton PlaybackSpeedButton"
                             Content="{Binding TimelineZoomText}"
                             Command="{Binding ResetTimelineZoomCommand}"
                             ToolTip.Tip="{markups:Translate Playback_ZoomReset}" />
-                    <Button Classes="PlaybackIconButton"
+                    <Button Classes="AppIconButton PlaybackIconButton"
                             Command="{Binding ZoomTimelineInCommand}"
                             ToolTip.Tip="{markups:Translate Playback_ZoomIn}">
-                        <Path Classes="PlaybackGlyph" Data="{StaticResource plus}" />
+                        <Path Classes="Glyph GlyphLg" Data="{StaticResource plus}" />
                     </Button>
                 </StackPanel>
             </Grid>
@@ -351,15 +347,15 @@
                             Classes="PlaybackWorkspaceTabStrip"
                             IsVisible="{Binding HasSelectedCombatant}">
                         <StackPanel Orientation="Horizontal" Spacing="0">
-                            <Button Classes="PlaybackWorkspaceTab"
+                            <Button Classes="AppButton PlaybackWorkspaceTab"
                                     Classes.PlaybackSelected="{Binding IsOutgoingDetailSelected}"
                                     Content="{markups:Translate Direction_Outgoing}"
                                     Command="{Binding ShowOutgoingDetailCommand}" />
-                            <Button Classes="PlaybackWorkspaceTab"
+                            <Button Classes="AppButton PlaybackWorkspaceTab"
                                     Classes.PlaybackSelected="{Binding IsIncomingDetailSelected}"
                                     Content="{markups:Translate Direction_Incoming}"
                                     Command="{Binding ShowIncomingDetailCommand}" />
-                            <Button Classes="PlaybackWorkspaceTab"
+                            <Button Classes="AppButton PlaybackWorkspaceTab"
                                     Classes.PlaybackSelected="{Binding IsAurasDetailSelected}"
                                     Content="{markups:Translate Playback_AuraCoverage}"
                                     Command="{Binding ShowAurasDetailCommand}" />

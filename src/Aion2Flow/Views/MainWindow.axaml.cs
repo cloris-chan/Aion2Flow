@@ -35,7 +35,8 @@ public partial class MainWindow : Window
     private readonly UiScaleService _uiScale;
     private readonly LocalizationService _localization;
     private readonly SkillMonitorWindowController _skillMonitorWindowController;
-    private readonly PlaybackWindowController _playbackWindowController = new();
+    private readonly OwnedWindowController _playbackWindowController = new();
+    private readonly OwnedWindowController _settingsWindowController = new();
     private readonly Control? _overlayRoot;
     private OverlayPinWindow? _pinWindow;
     private bool _hotkeyAttached;
@@ -73,7 +74,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _overlayRoot = Content as Control;
         DataContext.EncounterHistory.CollectionChanged += OnEncounterHistoryCollectionChanged;
-        DataContext.SettingsFlyout.PropertyChanged += OnSettingsFlyoutPropertyChanged;
+        DataContext.Settings.PropertyChanged += OnSettingsPropertyChanged;
         RefreshHeaderVisibilityPreference();
         RebuildEncounterHistoryMenuItems();
         _globalHotkeyService.Triggered += OnGlobalHotkeyTriggered;
@@ -89,7 +90,7 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
-        DataContext.SettingsFlyout.RefreshTargetProcessForegroundState();
+        DataContext.Settings.RefreshTargetProcessForegroundState();
         _uiScale.RegisterWindow(this);
         RebuildEncounterHistoryMenuItems();
         AttachGlobalHotkeyHook();
@@ -132,7 +133,7 @@ public partial class MainWindow : Window
 
         Win32Properties.AddWndProcHookCallback(this, WndProcHook);
         _globalHotkeyService.AttachWindow(hwnd);
-        DataContext.SettingsFlyout.RefreshHotkeyRegistrationState(_globalHotkeyService.IsAttachedTo(hwnd));
+        DataContext.Settings.RefreshHotkeyRegistrationState(_globalHotkeyService.IsAttachedTo(hwnd));
         _hotkeyAttached = true;
     }
 
@@ -157,7 +158,7 @@ public partial class MainWindow : Window
 
     private void OnGlobalHotkeyTriggered(GlobalHotkeyAction action)
     {
-        if (DataContext.SettingsFlyout.CapturingHotkeyAction is not null)
+        if (DataContext.Settings.CapturingHotkeyAction is not null)
         {
             return;
         }
@@ -177,7 +178,7 @@ public partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         DataContext.EncounterHistory.CollectionChanged -= OnEncounterHistoryCollectionChanged;
-        DataContext.SettingsFlyout.PropertyChanged -= OnSettingsFlyoutPropertyChanged;
+        DataContext.Settings.PropertyChanged -= OnSettingsPropertyChanged;
         _globalHotkeyService.Triggered -= OnGlobalHotkeyTriggered;
         _overlayInteractionController.ModeChanged -= OnOverlayInteractionModeChanged;
         PositionChanged -= OnWindowPositionChanged;
@@ -434,7 +435,7 @@ public partial class MainWindow : Window
             return false;
         }
 
-        var isTopmost = DataContext.SettingsFlyout.IsAlwaysOnTop;
+        var isTopmost = DataContext.Settings.IsAlwaysOnTop;
         if (!NativeOverlayWindowStyles.SetTopmostBand(this, isTopmost))
         {
             return false;
@@ -449,9 +450,9 @@ public partial class MainWindow : Window
             && NativeOverlayWindowStyles.IsImmediatelyAbove(pinWindow, this);
     }
 
-    private void OnSettingsFlyoutPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.IsAlwaysOnTop))
+        if (e.PropertyName == nameof(SettingsViewModel.IsAlwaysOnTop))
         {
             if (!SynchronizeOverlayTopmostBand())
             {
@@ -460,14 +461,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (e.PropertyName == nameof(SettingsFlyoutViewModel.HideHeaderWhenClickThrough))
+        if (e.PropertyName == nameof(SettingsViewModel.HideHeaderWhenClickThrough))
         {
             RefreshHeaderVisibilityPreference();
         }
     }
 
     private void RefreshHeaderVisibilityPreference() =>
-        MainHudShell.Classes.Set("hide-header-when-click-through", DataContext.SettingsFlyout.HideHeaderWhenClickThrough);
+        MainHudShell.Classes.Set("hide-header-when-click-through", DataContext.Settings.HideHeaderWhenClickThrough);
 
     private void UpdateClickThroughCursorState(TimeSpan timestamp)
     {
@@ -543,12 +544,19 @@ public partial class MainWindow : Window
 
     private void CloseTransientSurfaces()
     {
-        SettingsButton.Flyout?.Hide();
         EncounterHistoryButton.Flyout?.Hide();
         if (GetValue(FlyoutBase.AttachedFlyoutProperty) is Flyout detailsFlyout)
         {
             detailsFlyout.Hide();
         }
+    }
+
+    private void OpenSettings(object? sender, RoutedEventArgs e)
+    {
+        if (_settingsWindowController.TryActivate())
+            return;
+
+        _settingsWindowController.Show(new SettingsWindow(), this);
     }
 
     private void Minimize(object? sender, RoutedEventArgs e)
@@ -815,6 +823,7 @@ public partial class MainWindow : Window
             }
         };
         ToolTip.SetTip(playbackButton, DataContext.Localization["Playback_Open"]);
+        playbackButton.Classes.Add("AppIconButton");
         playbackButton.Classes.Add("FlyoutInlineButton");
         if (playbackButton.Content is Avalonia.Controls.Shapes.Path playbackIcon)
         {
@@ -883,7 +892,7 @@ public partial class MainWindow : Window
                 context.Source,
                 context.DisplayContext,
                 DataContext.Localization,
-                DataContext.SettingsFlyout);
+                DataContext.Settings);
         }
         catch
         {

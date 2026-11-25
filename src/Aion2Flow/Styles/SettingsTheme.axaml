@@ -1,0 +1,184 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Styles.Resources>
+        <ControlTheme x:Key="SettingsChoiceItemTheme" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="2,0,0,0" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Margin" Value="0,1" />
+            <Setter Property="Padding" Value="9,5" />
+            <Setter Property="FocusAdorner" Value="{StaticResource AppFocusAdorner}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Padding="{TemplateBinding Padding}"
+                                      VerticalContentAlignment="Center"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover, ^:focus-visible">
+                <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AppBrush.SeparatorStrong}" />
+            </Style>
+            <Style Selector="^:selected">
+                <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
+                <Setter Property="Foreground" Value="{StaticResource AppBrush.AccentStrong}" />
+            </Style>
+        </ControlTheme>
+    </Styles.Resources>
+
+    <Style Selector="TabControl.SettingsNavigation">
+        <Setter Property="ItemsPanel">
+            <ItemsPanelTemplate>
+                <StackPanel />
+            </ItemsPanelTemplate>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Grid ColumnDefinitions="184,*">
+                    <Border Background="{StaticResource AppBrush.Band}"
+                            BorderBrush="{StaticResource AppBrush.Separator}"
+                            BorderThickness="0,0,1,0"
+                            Padding="10,18">
+                        <ScrollViewer Classes="AppScrollViewer" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+                        </ScrollViewer>
+                    </Border>
+                    <ContentPresenter Name="PART_SelectedContentHost"
+                                      Grid.Column="1"
+                                      Content="{TemplateBinding SelectedContent}"
+                                      ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="TabItem.SettingsCategory">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="10,9" />
+        <Setter Property="Margin" Value="0,2" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="FocusAdorner" Value="{StaticResource AppFocusAdorner}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="2,0,0,0"
+                        CornerRadius="4"
+                        Padding="{TemplateBinding Padding}">
+                    <TextBlock Text="{TemplateBinding Header}"
+                               Foreground="{TemplateBinding Foreground}"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover">
+            <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
+            <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
+        </Style>
+        <Style Selector="^:selected">
+            <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
+            <Setter Property="Foreground" Value="{StaticResource AppBrush.AccentStrong}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Style>
+
+    <Style Selector=":is(Panel).SettingsPage">
+        <Setter Property="Margin" Value="24,20" />
+    </Style>
+    <Style Selector="StackPanel.SettingsPage">
+        <Setter Property="Spacing" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.SettingsPageTitle">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Title}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.SettingsGroup">
+        <Setter Property="Background" Value="{StaticResource AppBrush.Surface}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.SettingsGroupTitle">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.SettingsLabel">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.SettingsValue">
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.SettingsHint">
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.TextMuted}" />
+        <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.SettingsWarning">
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Accent}" />
+    </Style>
+    <Style Selector="ComboBox.SettingsChoice">
+        <Setter Property="Background" Value="{StaticResource AppBrush.Band}" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="10,5" />
+        <Setter Property="MaxDropDownHeight" Value="308" />
+        <Setter Property="ItemContainerTheme" Value="{StaticResource SettingsChoiceItemTheme}" />
+        <Setter Property="FocusAdorner" Value="{StaticResource AppFocusAdorner}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ComboBox.SettingsChoice:dropdownopen /template/ Border#border">
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
+    </Style>
+    <Style Selector="ComboBox.SettingsChoice /template/ Popup#PART_Popup > Border">
+        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.SeparatorStrong}" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
+    <Style Selector="ComboBox.SettingsChoice /template/ Popup#PART_Popup > Border > ScrollViewer /template/ ScrollBar">
+        <Setter Property="Theme" Value="{StaticResource CommonScrollbarTheme}" />
+    </Style>
+    <Style Selector="Border.SettingsHotkeyEditor">
+        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Style Selector="^:pointerover">
+            <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
+        </Style>
+        <Style Selector="^:focus">
+            <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Accent}" />
+        </Style>
+    </Style>
+    <Style Selector="Button.SettingsClearHotkey">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
+        <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.SettingsClearHotkey Path.Glyph">
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.TextMuted}" />
+    </Style>
+</Styles>

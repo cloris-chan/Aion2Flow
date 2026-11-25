@@ -10,7 +10,8 @@
         <x:Double x:Key="AppFontSize.Emphasis">15</x:Double>
         <x:Double x:Key="AppFontSize.Title">18</x:Double>
 
-        <SolidColorBrush x:Key="AppBrush.Canvas">#080C10</SolidColorBrush>
+        <Color x:Key="AppColor.Canvas">#080C10</Color>
+        <SolidColorBrush x:Key="AppBrush.Canvas" Color="{StaticResource AppColor.Canvas}" />
         <SolidColorBrush x:Key="AppBrush.Band">#0C1217</SolidColorBrush>
         <SolidColorBrush x:Key="AppBrush.Surface">#111920</SolidColorBrush>
         <SolidColorBrush x:Key="AppBrush.SurfaceRaised">#151F27</SolidColorBrush>
@@ -24,9 +25,60 @@
         <SolidColorBrush x:Key="AppBrush.Accent">#E3C78C</SolidColorBrush>
         <SolidColorBrush x:Key="AppBrush.AccentStrong">#F0DCA8</SolidColorBrush>
 
-        <SolidColorBrush x:Key="CommonBrush.ScrollbarTrack">#3403080C</SolidColorBrush>
-        <SolidColorBrush x:Key="CommonBrush.ScrollbarThumb">#688AA4B6</SolidColorBrush>
-        <SolidColorBrush x:Key="CommonBrush.ScrollbarThumbHover">#86B5C9D6</SolidColorBrush>
+        <StaticResource x:Key="ThemeAccentBrush" ResourceKey="AppBrush.Accent" />
+        <StaticResource x:Key="HighlightBrush" ResourceKey="AppBrush.Accent" />
+        <StaticResource x:Key="ThemeForegroundBrush" ResourceKey="AppBrush.Text" />
+        <StaticResource x:Key="ThemeBackgroundBrush" ResourceKey="AppBrush.Band" />
+        <StaticResource x:Key="ThemeControlMidBrush" ResourceKey="AppBrush.SurfaceRaised" />
+        <StaticResource x:Key="ThemeControlHighBrush" ResourceKey="AppBrush.SurfaceSelected" />
+        <StaticResource x:Key="ThemeBorderLowBrush" ResourceKey="AppBrush.Separator" />
+        <StaticResource x:Key="ThemeBorderMidBrush" ResourceKey="AppBrush.SeparatorStrong" />
+        <StaticResource x:Key="ThemeBorderHighBrush" ResourceKey="AppBrush.TextSubtle" />
+
+        <Template x:Key="AppFocusAdorner">
+            <Border BorderBrush="{StaticResource AppBrush.Accent}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    IsHitTestVisible="False" />
+        </Template>
+
+        <ControlTheme x:Key="AppButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceRaised}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppBrush.Separator}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusAdorner" Value="{StaticResource AppFocusAdorner}" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      BorderBrush="{TemplateBinding BorderBrush}"
+                                      BorderThickness="{TemplateBinding BorderThickness}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Padding="{TemplateBinding Padding}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      RecognizesAccessKey="True" />
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceHover}" />
+                <Setter Property="BorderBrush" Value="{StaticResource AppBrush.SeparatorStrong}" />
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceSelected}" />
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.45" />
+                <Setter Property="Cursor" Value="Arrow" />
+            </Style>
+        </ControlTheme>
 
         <ControlTheme x:Key="CommonScrollbarPageButtonTheme"
                       TargetType="RepeatButton">
@@ -43,33 +95,36 @@
 
         <ControlTheme x:Key="CommonScrollbarThumbTheme"
                       TargetType="Thumb">
-            <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumb}" />
+            <Setter Property="Background" Value="{StaticResource AppBrush.SeparatorStrong}" />
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Border Background="{TemplateBinding Background}"
-                            CornerRadius="999" />
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="999" />
+                    </Border>
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:pointerover">
-                <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumbHover}" />
+                <Setter Property="Background" Value="{StaticResource AppBrush.TextSubtle}" />
             </Style>
             <Style Selector="^:pressed">
-                <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarThumbHover}" />
+                <Setter Property="Background" Value="{StaticResource AppBrush.TextMuted}" />
             </Style>
         </ControlTheme>
 
         <ControlTheme x:Key="CommonScrollbarTheme"
                       TargetType="ScrollBar">
-            <Setter Property="Background" Value="{StaticResource CommonBrush.ScrollbarTrack}" />
-            <Setter Property="Foreground" Value="{StaticResource CommonBrush.ScrollbarThumb}" />
+            <Setter Property="Background" Value="{StaticResource AppBrush.SurfaceRaised}" />
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0" />
+            </Style>
 
             <Style Selector="^:horizontal">
-                <Setter Property="Height" Value="12" />
-                <Setter Property="Margin" Value="0,8,0,0" />
+                <Setter Property="Height" Value="14" />
+                <Setter Property="Margin" Value="4,4,4,3" />
                 <Setter Property="Template">
                     <ControlTemplate>
                         <Grid Height="{TemplateBinding Height}">
-                            <Border Height="6"
+                            <Border Height="4"
                                     Background="{TemplateBinding Background}"
                                     CornerRadius="999"
                                     VerticalAlignment="Center" />
@@ -80,18 +135,18 @@
                                    ViewportSize="{TemplateBinding ViewportSize}"
                                    Orientation="{TemplateBinding Orientation}">
                                 <Track.DecreaseButton>
-                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                    <RepeatButton Name="PART_PageUpButton"
+                                                  Theme="{StaticResource CommonScrollbarPageButtonTheme}"
                                                   Focusable="False" />
                                 </Track.DecreaseButton>
                                 <Track.IncreaseButton>
-                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                    <RepeatButton Name="PART_PageDownButton"
+                                                  Theme="{StaticResource CommonScrollbarPageButtonTheme}"
                                                   Focusable="False" />
                                 </Track.IncreaseButton>
-                                <Thumb Name="AppScrollbarThumb"
-                                       Theme="{StaticResource CommonScrollbarThumbTheme}"
-                                       MinWidth="48"
-                                       Height="6"
-                                       VerticalAlignment="Center" />
+                                <Thumb Theme="{StaticResource CommonScrollbarThumbTheme}"
+                                       MinWidth="28"
+                                       Padding="0,3" />
                             </Track>
                         </Grid>
                     </ControlTemplate>
@@ -99,12 +154,12 @@
             </Style>
 
             <Style Selector="^:vertical">
-                <Setter Property="Width" Value="12" />
-                <Setter Property="Margin" Value="8,0,0,0" />
+                <Setter Property="Width" Value="14" />
+                <Setter Property="Margin" Value="4,4,3,4" />
                 <Setter Property="Template">
                     <ControlTemplate>
                         <Grid Width="{TemplateBinding Width}">
-                            <Border Width="6"
+                            <Border Width="4"
                                     Background="{TemplateBinding Background}"
                                     CornerRadius="999"
                                     HorizontalAlignment="Center" />
@@ -116,18 +171,18 @@
                                    Orientation="{TemplateBinding Orientation}"
                                    IsDirectionReversed="True">
                                 <Track.DecreaseButton>
-                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                    <RepeatButton Name="PART_PageUpButton"
+                                                  Theme="{StaticResource CommonScrollbarPageButtonTheme}"
                                                   Focusable="False" />
                                 </Track.DecreaseButton>
                                 <Track.IncreaseButton>
-                                    <RepeatButton Theme="{StaticResource CommonScrollbarPageButtonTheme}"
+                                    <RepeatButton Name="PART_PageDownButton"
+                                                  Theme="{StaticResource CommonScrollbarPageButtonTheme}"
                                                   Focusable="False" />
                                 </Track.IncreaseButton>
-                                <Thumb Name="AppScrollbarThumb"
-                                       Theme="{StaticResource CommonScrollbarThumbTheme}"
-                                       Width="6"
-                                       MinHeight="48"
-                                       HorizontalAlignment="Center" />
+                                <Thumb Theme="{StaticResource CommonScrollbarThumbTheme}"
+                                       MinHeight="28"
+                                       Padding="3,0" />
                             </Track>
                         </Grid>
                     </ControlTemplate>
@@ -136,7 +191,7 @@
         </ControlTheme>
     </Styles.Resources>
 
-    <Style Selector="TemplatedControl">
+    <Style Selector=":is(TemplatedControl)">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
     </Style>
@@ -149,6 +204,46 @@
     <Style Selector="controls|NumericBlock">
         <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
         <Setter Property="FontSize" Value="{StaticResource AppFontSize.Body}" />
+    </Style>
+
+    <Style Selector="Window.AppWindow">
+        <Setter Property="Background" Value="{StaticResource AppBrush.Canvas}" />
+        <Setter Property="Foreground" Value="{StaticResource AppBrush.Text}" />
+    </Style>
+
+    <Style Selector="Button.AppButton, Button.AppIconButton">
+        <Setter Property="Theme" Value="{StaticResource AppButtonTheme}" />
+    </Style>
+
+    <Style Selector="Button.AppButton">
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="12,5" />
+    </Style>
+
+    <Style Selector="Button.AppIconButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style Selector="Path.Glyph">
+        <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="Stroke" Value="{StaticResource AppBrush.Text}" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Path.GlyphSm">
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Height" Value="12" />
+    </Style>
+    <Style Selector="Path.GlyphMd">
+        <Setter Property="Width" Value="14" />
+        <Setter Property="Height" Value="14" />
+    </Style>
+    <Style Selector="Path.GlyphLg">
+        <Setter Property="Width" Value="16" />
+        <Setter Property="Height" Value="16" />
     </Style>
 
     <Style Selector="ScrollViewer.AppScrollViewer /template/ ScrollBar">

@@ -5,7 +5,7 @@ using Cloris.Aion2Flow.Views;
 namespace Cloris.Aion2Flow.Tests.App;
 
 [Collection(AvaloniaTestCollection.Name)]
-public sealed class PlaybackWindowControllerTests
+public sealed class OwnedWindowControllerTests
 {
     [Fact]
     public void ExistingWindowIsActivatedAndControllerClearsAfterClose()
@@ -14,7 +14,7 @@ public sealed class PlaybackWindowControllerTests
         {
             var owner = new Window();
             var playback = new Window();
-            var controller = new PlaybackWindowController();
+            var controller = new OwnedWindowController();
             owner.Show();
 
             try
@@ -49,7 +49,7 @@ public sealed class PlaybackWindowControllerTests
         {
             var owner = new Window();
             var playback = new Window();
-            var controller = new PlaybackWindowController();
+            var controller = new OwnedWindowController();
             owner.Show();
 
             try
